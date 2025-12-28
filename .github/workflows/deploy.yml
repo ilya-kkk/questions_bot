@@ -15,9 +15,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set working directory
-        working-directory: ${{ github.workspace }}
-      
       - name: Stop and remove containers
         run: |
           echo "Останавливаем контейнеры..."
