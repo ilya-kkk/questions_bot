@@ -19,7 +19,8 @@ services:
     depends_on:
       - postgres
     command: python -m app.bot
-
+    env_file:
+      - .env
     environment:
       DB_HOST: postgres
     volumes:
