@@ -69,6 +69,37 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Обработчик текстовых сообщений (для Reply Keyboard кнопок)"""
     text = update.message.text
     
+    # Обработка кнопки "Случайный вопрос" (приоритет над обработкой ответа)
+    if text == "🎲 Случайный вопрос":
+        # Очищаем предыдущий вопрос из контекста, если был
+        if 'current_question' in context.user_data:
+            del context.user_data['current_question']
+        
+        question = db.get_random_question()
+        
+        if not question:
+            await update.message.reply_text(
+                "❌ Не удалось получить вопрос из базы данных",
+                reply_markup=reply_markup
+            )
+            return
+        
+        # Сохраняем вопрос в context для последующей обработки ответа
+        context.user_data['current_question'] = {
+            'id': question['id'],
+            'question': question['question'],
+            'topic': question.get('topic', ''),
+            'answer': question.get('answer', '')
+        }
+        
+        message = f"❓ <b>Вопрос #{question['id']}</b>\n\n"
+        message += f"<b>Тема:</b> {question.get('topic', 'Не указана')}\n\n"
+        message += f"<b>Вопрос:</b>\n{question['question']}\n\n"
+        message += "💬 <b>Отправь свой ответ текстом, и я оценю его!</b>"
+        
+        await update.message.reply_text(message, parse_mode='HTML', reply_markup=reply_markup)
+        return
+    
     # Проверяем, есть ли активный вопрос в контексте (пользователь отвечает на вопрос)
     if 'current_question' in context.user_data:
         # Это ответ пользователя на вопрос
@@ -81,19 +112,29 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Оцениваем ответ через LLM
         if llm_service:
             try:
+                print(f"Оцениваю ответ пользователя на вопрос #{current_question['id']}")
                 evaluation = llm_service.evaluate_answer(
                     question=current_question['question'],
                     user_answer=user_answer,
                     correct_answer=current_question.get('answer')
                 )
                 
+                print(f"Получена оценка от LLM: {evaluation[:100]}...")
+                
                 # Формируем сообщение с оценкой
                 response_message = f"📝 <b>Оценка твоего ответа:</b>\n\n{evaluation}"
                 await processing_msg.edit_text(response_message, parse_mode='HTML')
                 
             except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
+                print(f"Ошибка при оценке ответа: {error_details}")
+                error_msg = str(e)
+                # Ограничиваем длину сообщения об ошибке для Telegram
+                if len(error_msg) > 200:
+                    error_msg = error_msg[:200] + "..."
                 await processing_msg.edit_text(
-                    f"❌ Ошибка при оценке ответа: {str(e)}",
+                    f"❌ Ошибка при оценке ответа: {error_msg}",
                     parse_mode='HTML'
                 )
         else:
@@ -118,34 +159,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         del context.user_data['current_question']
         
         return
-    
-    # Обработка кнопки "Случайный вопрос"
-    if text == "🎲 Случайный вопрос":
-        question = db.get_random_question()
-        
-        if not question:
-            await update.message.reply_text(
-                "❌ Не удалось получить вопрос из базы данных",
-                reply_markup=reply_markup
-            )
-            return
-        
-        # Сохраняем вопрос в context для последующей обработки ответа
-        context.user_data['current_question'] = {
-            'id': question['id'],
-            'question': question['question'],
-            'topic': question.get('topic', ''),
-            'answer': question.get('answer', '')
-        }
-        
-        message = f"❓ <b>Вопрос #{question['id']}</b>\n\n"
-        message += f"<b>Тема:</b> {question.get('topic', 'Не указана')}\n\n"
-        message += f"<b>Вопрос:</b>\n{question['question']}\n\n"
-        message += "💬 <b>Отправь свой ответ текстом, и я оценю его!</b>"
-        
-        await update.message.reply_text(message, parse_mode='HTML', reply_markup=reply_markup)
     else:
-        # Если пользователь отправил другой текст, показываем подсказку
+        # Если пользователь отправил другой текст и нет активного вопроса, показываем подсказку
         await update.message.reply_text(
             "Используй кнопку '🎲 Случайный вопрос' для получения вопроса!",
             reply_markup=reply_markup
@@ -153,9 +168,18 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
+    import traceback
+    error_details = traceback.format_exc()
     print(f"Ошибка при обработке обновления: {context.error}")
+    print(f"Детали ошибки: {error_details}")
+    
     if update and update.message:
-        await update.message.reply_text(
-            "❌ Произошла ошибка. Попробуйте позже или используйте /help"
-        )
+        try:
+            await update.message.reply_text(
+                f"❌ Произошла ошибка: {str(context.error)}\n\nПопробуйте позже или используйте /help",
+                reply_markup=reply_markup
+            )
+        except:
+            # Если не удалось отправить сообщение, просто логируем
+            pass
 

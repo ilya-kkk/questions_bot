@@ -39,19 +39,18 @@ class LLMService:
         user_prompt += f"Ответ пользователя: {user_answer}\n\n"
         user_prompt += "Дай оценку и короткий совет как улучшить мои знания и чего не хватает в моем ответе на вопрос."
         
-        try:
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=200  # Ограничиваем длину ответа для короткого совета
-            )
-            
-            return response.choices[0].message.content.strip()
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=200  # Ограничиваем длину ответа для короткого совета
+        )
         
-        except Exception as e:
-            return f"❌ Ошибка при оценке ответа: {str(e)}"
+        if not response.choices or not response.choices[0].message:
+            raise ValueError("Пустой ответ от OpenAI API")
+        
+        return response.choices[0].message.content.strip()
 
