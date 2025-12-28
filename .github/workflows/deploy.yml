@@ -16,25 +16,43 @@ jobs:
         run: |
           echo "Останавливаем контейнеры перед checkout..."
           # Checkout создает поддиректорию с именем репозитория
-          REPO_PATH="/home/cm5/actions-runner/_work/questions_bot"
+          REPO_PATH="/home/cm5/actions-runner/_work/questions_bot/questions_bot"
           if [ -d "$REPO_PATH" ]; then
-            cd "$REPO_PATH" && docker compose down 2>/dev/null || true
+            echo "Останавливаем и удаляем все контейнеры..."
+            cd "$REPO_PATH" && docker compose down -v 2>/dev/null || true
+            docker stop postgres questions_bot 2>/dev/null || true
+            docker rm postgres questions_bot 2>/dev/null || true
+            echo "Ожидание завершения процессов..."
+            sleep 2
             echo "Исправление прав доступа на всю директорию..."
             sudo chown -R $(whoami):$(whoami) "$REPO_PATH" 2>/dev/null || true
-            echo "Удаление postgres/ и других файлов..."
+            echo "Принудительное удаление postgres/..."
             sudo rm -rf "$REPO_PATH/postgres" 2>/dev/null || true
-            sudo rm -rf "$REPO_PATH/app" 2>/dev/null || true
-            sudo rm -f "$REPO_PATH/docker-compose.yaml" 2>/dev/null || true
-            sudo rm -f "$REPO_PATH/Dockerfile" 2>/dev/null || true
-            sudo rm -f "$REPO_PATH/requirements.txt" 2>/dev/null || true
-            sudo rm -f "$REPO_PATH/raw.json" 2>/dev/null || true
-            sudo rm -rf "$REPO_PATH/.github" 2>/dev/null || true
+            # Пробуем убить процессы, которые могут блокировать postgres/
+            sudo fuser -k "$REPO_PATH/postgres" 2>/dev/null || true
+            sudo rm -rf "$REPO_PATH/postgres" 2>/dev/null || true
             echo "Директория очищена для checkout"
           fi
           echo "Подготовка завершена"
       
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          clean: false
+      
+      - name: Force clean postgres directory
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "Принудительная очистка postgres/ после checkout..."
+          # Останавливаем процессы, которые могут блокировать
+          docker stop postgres 2>/dev/null || true
+          docker rm postgres 2>/dev/null || true
+          sudo fuser -km ./postgres 2>/dev/null || true
+          sleep 1
+          # Исправляем права и удаляем
+          sudo chown -R $(whoami):$(whoami) postgres/ 2>/dev/null || true
+          sudo rm -rf postgres/ 2>/dev/null || true
+          echo "postgres/ очищен"
       
       - name: Verify checkout and list files
         working-directory: ${{ github.workspace }}
