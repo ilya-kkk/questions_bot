@@ -15,11 +15,11 @@ load_dotenv()
 
 # Параметры подключения к БД из переменных окружения
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'host': os.getenv('POSTGRES_HOST'),
     'port': int(os.getenv('POSTGRES_PORT', '5432')),
-    'database': os.getenv('POSTGRES_DB', 'app_db'),
-    'user': os.getenv('POSTGRES_USER', 'app_user'),
-    'password': os.getenv('POSTGRES_PASSWORD', 'strong_password')
+    'database': os.getenv('POSTGRES_DB'),
+    'user': os.getenv('POSTGRES_USER'),
+    'password': os.getenv('POSTGRES_PASSWORD')
 }
 
 def create_table(cursor):
