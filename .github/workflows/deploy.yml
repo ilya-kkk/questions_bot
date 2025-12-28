@@ -31,28 +31,6 @@ jobs:
           sudo rm -rf "$REPO_PATH" 2>/dev/null || true
           echo "Директория полностью удалена, checkout создаст её заново"
       
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Verify checkout and list files
-        working-directory: ${{ github.workspace }}
-        run: |
-          echo "Текущая директория: $(pwd)"
-          echo "Содержимое директории:"
-          ls -la
-          echo "Проверка наличия docker-compose.yaml:"
-          if [ -f "docker-compose.yaml" ]; then
-            echo "✓ docker-compose.yaml найден"
-          elif [ -f "docker-compose.yml" ]; then
-            echo "✓ docker-compose.yml найден"
-          else
-            echo "✗ Файл docker-compose не найден!"
-            echo "Проверка наличия основных файлов проекта:"
-            ls -la | grep -E "(docker|Dockerfile|app|requirements)" || echo "Файлы проекта не найдены"
-            echo "Попытка повторного checkout..."
-            exit 1
-          fi
-      
       - name: Clean repository and fix permissions after checkout
         working-directory: ${{ github.workspace }}
         run: |
