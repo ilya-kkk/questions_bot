@@ -15,6 +15,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Copy .env file
+        run: |
+          echo "Копирование .env файла..."
+          cp /home/cm5/questions_bot/.env .env || (echo "Ошибка: .env файл не найден в /home/cm5/questions_bot/.env" && exit 1)
+          echo ".env файл скопирован в $(pwd)"
+      
       - name: Stop and remove containers
         run: |
           echo "Останавливаем контейнеры..."
