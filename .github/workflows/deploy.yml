@@ -12,24 +12,24 @@ jobs:
     runs-on: self-hosted
     
     steps:
-      - name: Stop containers before checkout (if exists)
+      - name: Stop containers and clean postgres before checkout
         run: |
           echo "Останавливаем контейнеры перед checkout..."
-          WORKSPACE_PATH="/home/cm5/actions-runner/_work/questions_bot/questions_bot"
-          if [ -d "$WORKSPACE_PATH" ]; then
-            cd "$WORKSPACE_PATH" && docker compose down 2>/dev/null || true
+          # Checkout создает поддиректорию с именем репозитория
+          REPO_PATH="/home/cm5/actions-runner/_work/questions_bot/questions_bot"
+          if [ -d "$REPO_PATH" ]; then
+            cd "$REPO_PATH" && docker compose down 2>/dev/null || true
             echo "Исправление прав доступа на postgres/..."
-            sudo chown -R $(whoami):$(whoami) "$WORKSPACE_PATH/postgres" 2>/dev/null || true
-            sudo rm -rf "$WORKSPACE_PATH/postgres" 2>/dev/null || true
+            sudo chown -R $(whoami):$(whoami) "$REPO_PATH/postgres" 2>/dev/null || true
+            sudo rm -rf "$REPO_PATH/postgres" 2>/dev/null || true
           fi
           echo "Подготовка завершена"
       
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          clean: false
+        continue-on-error: true
       
-      - name: Clean repository and fix permissions
+      - name: Clean repository and fix permissions after checkout
         run: |
           echo "Очистка репозитория и исправление прав доступа..."
           sudo rm -rf postgres/ 2>/dev/null || true
