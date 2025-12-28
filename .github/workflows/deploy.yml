@@ -14,7 +14,7 @@ jobs:
     steps:      
       - name: Stop and remove containers
         run: |
-          cd /home/cm5/actions-runner/_work/questions_bot
+          cd /home/cm5/questions_bot
           echo "Текущая директория: $(pwd)"
           echo "Содержимое директории:"
           ls -la
@@ -28,7 +28,7 @@ jobs:
       
       - name: Build and start containers
         run: |
-          cd /home/cm5/actions-runner/_work/questions_bot
+          cd /home/cm5/questions_bot
           echo "Текущая директория: $(pwd)"
           if [ -f "docker-compose.yaml" ]; then
             docker compose -f docker-compose.yaml up -d --build
@@ -42,13 +42,13 @@ jobs:
 
       - name: Show running containers
         run: |
-          cd /home/cm5/actions-runner/_work/questions_bot
+          cd /home/cm5/questions_bot
           echo "Статус контейнеров:"
           docker compose ps
       
       - name: Show container logs (last 20 lines)
         run: |
-          cd /home/cm5/actions-runner/_work/questions_bot
+          cd /home/cm5/questions_bot
           echo "Последние логи приложения:"
           docker compose logs --tail=20 app || true
 
