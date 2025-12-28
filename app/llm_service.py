@@ -1,6 +1,7 @@
 """
 Модуль для работы с OpenAI API для оценки ответов пользователей
 """
+import os
 import openai
 import httpx
 from typing import Optional
@@ -22,13 +23,21 @@ class LLMService:
         # Настраиваем клиент с прокси, если указан
         client_kwargs = {'api_key': LLM_API_KEY}
         
-        if LLM_PROXY_URL:
-            print(f"Используется прокси для OpenAI API: {LLM_PROXY_URL}")
+        # Определяем прокси: сначала из LLM_PROXY_URL, потом из системных переменных
+        proxy_url = LLM_PROXY_URL
+        if not proxy_url:
+            # Проверяем системные переменные окружения (если VLESS работает на уровне системы)
+            proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY') or os.getenv('https_proxy') or os.getenv('http_proxy')
+        
+        if proxy_url:
+            print(f"Используется прокси для OpenAI API: {proxy_url}")
             # Создаем HTTP клиент с прокси
             client_kwargs['http_client'] = httpx.Client(
-                proxies=LLM_PROXY_URL,
+                proxies=proxy_url,
                 timeout=30.0
             )
+        else:
+            print("Прокси не настроен. Запросы идут напрямую к OpenAI API.")
         
         self.client = openai.OpenAI(**client_kwargs)
     

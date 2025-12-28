@@ -14,7 +14,10 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 LLM_API_KEY = os.getenv('LLM_API_KEY')
 
 # Прокси для OpenAI API (опционально)
-LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', 'http://midorinote.online:8443/')
+# Если VLESS клиент работает на сервере, используйте локальный HTTP прокси
+# Обычно v2ray/xray создает HTTP прокси на localhost:10808 или другом порту
+# Если VLESS работает на уровне системы, оставьте пустым и используйте системные переменные HTTP_PROXY/HTTPS_PROXY
+LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', '')
 
 # Параметры подключения к БД
 DB_CONFIG = {
