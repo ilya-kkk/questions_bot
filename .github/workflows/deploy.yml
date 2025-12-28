@@ -68,21 +68,8 @@ jobs:
       - name: Build and start containers
         working-directory: ${{ github.workspace }}
         run: |
-          echo "Текущая директория: $(pwd)"
-          echo "Проверка наличия docker-compose файла..."
-          if [ -f "docker-compose.yaml" ]; then
-            COMPOSE_FILE="docker-compose.yaml"
-          elif [ -f "docker-compose.yml" ]; then
-            COMPOSE_FILE="docker-compose.yml"
-          else
-            echo "ОШИБКА: docker-compose файл не найден!"
-            echo "Содержимое директории:"
-            ls -la
-            exit 1
-          fi
-          echo "Используется файл: $COMPOSE_FILE"
-          echo "Собираем и запускаем контейнеры..."
-          docker compose -f "$COMPOSE_FILE" up -d --build
+          cd ..
+          docker compose up -d --build
           echo "Контейнеры запущены"
           echo "Исправление прав доступа на созданные файлы..."
           sudo chown -R $(whoami):$(whoami) app/__pycache__ 2>/dev/null || true
