@@ -24,7 +24,7 @@ jobs:
       - name: Stop and remove containers
         run: |
           echo "Останавливаем контейнеры..."
-          docker-compose down || true
+          docker compose down || true
           echo "Контейнеры остановлены"
       
       - name: Remove old images (optional cleanup)
@@ -41,10 +41,10 @@ jobs:
       - name: Show running containers
         run: |
           echo "Статус контейнеров:"
-          docker-compose ps
+          docker compose ps
       
       - name: Show container logs (last 20 lines)
         run: |
           echo "Последние логи приложения:"
-          docker-compose logs --tail=20 app || true
+          docker compose logs --tail=20 app || true
 
