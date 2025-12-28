@@ -29,7 +29,7 @@ jobs:
       - name: Build and start containers
         run: |
           echo "Собираем и запускаем контейнеры..."
-          docker-compose up -d --build
+          docker compose up -d --build
           echo "Контейнеры запущены"
       
       - name: Show running containers
