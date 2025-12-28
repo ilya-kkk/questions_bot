@@ -1,0 +1,47 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set working directory
+        working-directory: ${{ github.workspace }}
+      
+      - name: Stop and remove containers
+        run: |
+          echo "Останавливаем контейнеры..."
+          docker-compose down || true
+          echo "Контейнеры остановлены"
+      
+      - name: Remove old images (optional cleanup)
+        run: |
+          echo "Очистка неиспользуемых образов..."
+          docker image prune -f || true
+      
+      - name: Build and start containers
+        run: |
+          echo "Собираем и запускаем контейнеры..."
+          docker-compose up -d --build
+          echo "Контейнеры запущены"
+      
+      - name: Show running containers
+        run: |
+          echo "Статус контейнеров:"
+          docker-compose ps
+      
+      - name: Show container logs (last 20 lines)
+        run: |
+          echo "Последние логи приложения:"
+          docker-compose logs --tail=20 app || true
+
