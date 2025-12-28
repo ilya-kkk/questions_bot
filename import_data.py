@@ -46,7 +46,8 @@ def get_db_config():
         'port': int(port),
         'database': database,
         'user': user,
-        'password': password
+        'password': password,
+        'sslmode': 'disable'  # Отключаем SSL для подключения внутри Docker сети
     }
     
     print(f"Подключение к БД: host={config['host']}, database={config['database']}, user={config['user']}")
