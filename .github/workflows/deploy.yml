@@ -16,7 +16,7 @@ jobs:
         run: |
           echo "Останавливаем контейнеры перед checkout..."
           # Checkout создает поддиректорию с именем репозитория
-          REPO_PATH="/home/cm5/actions-runner/_work/questions_bot/questions_bot"
+          REPO_PATH="/home/cm5/actions-runner/_work/questions_bot"
           if [ -d "$REPO_PATH" ]; then
             cd "$REPO_PATH" && docker compose down 2>/dev/null || true
             echo "Исправление прав доступа на всю директорию..."
