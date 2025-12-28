@@ -35,13 +35,13 @@ def main():
         logger.error("BOT_TOKEN не установлен! Создайте файл .env и добавьте BOT_TOKEN")
         return
     
-    # Создаем таблицу logs если её нет
+    # Создаем таблицу user_logs если её нет
     db = Database()
     try:
         db.create_logs_table()
-        logger.info("Таблица logs проверена/создана")
+        logger.info("Таблица user_logs проверена/создана")
     except Exception as e:
-        logger.warning(f"Не удалось создать таблицу logs: {e}")
+        logger.warning(f"Не удалось создать таблицу user_logs: {e}")
     
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()

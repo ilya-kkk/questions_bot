@@ -38,22 +38,33 @@ class Database:
             return None
     
     def create_logs_table(self):
-        """Создает таблицу logs если её нет"""
+        """Создает таблицу user_logs если её нет"""
         try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS logs (
-                            id SERIAL PRIMARY KEY,
-                            timestamp TIMESTAMP DEFAULT NOW(),
-                            username TEXT NOT NULL,
-                            question_id INTEGER NOT NULL,
-                            FOREIGN KEY (question_id) REFERENCES questions(id)
-                        )
-                    """)
-                    conn.commit()
+            conn = self.get_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS user_logs (
+                        id SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMP DEFAULT NOW(),
+                        username TEXT NOT NULL,
+                        question_id INTEGER NOT NULL,
+                        FOREIGN KEY (question_id) REFERENCES questions(id)
+                    )
+                """)
+                conn.commit()
+                cursor.close()
+                print("Таблица user_logs успешно создана/проверена")
+            except Exception as e:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
         except psycopg2.Error as e:
-            print(f"Ошибка при создании таблицы logs: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Ошибка при создании таблицы user_logs: {e}")
+            print(f"Детали ошибки: {error_details}")
     
     def log_question_answer(self, username: str, question_id: int, timestamp: Optional[datetime] = None):
         """
@@ -65,25 +76,37 @@ class Database:
             timestamp: Временная метка (если None, используется NOW())
         """
         try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    if timestamp:
-                        cursor.execute(
-                            """
-                            INSERT INTO logs (timestamp, username, question_id)
-                            VALUES (%s, %s, %s)
-                            """,
-                            (timestamp, username, question_id)
-                        )
-                    else:
-                        cursor.execute(
-                            """
-                            INSERT INTO logs (username, question_id)
-                            VALUES (%s, %s)
-                            """,
-                            (username, question_id)
-                        )
-                    conn.commit()
+            conn = self.get_connection()
+            try:
+                cursor = conn.cursor()
+                if timestamp:
+                    cursor.execute(
+                        """
+                        INSERT INTO user_logs (timestamp, username, question_id)
+                        VALUES (%s, %s, %s)
+                        """,
+                        (timestamp, username, question_id)
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO user_logs (username, question_id)
+                        VALUES (%s, %s)
+                        """,
+                        (username, question_id)
+                    )
+                conn.commit()
+                cursor.close()
+                print(f"Лог успешно записан: username={username}, question_id={question_id}")
+            except Exception as e:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
         except psycopg2.Error as e:
+            import traceback
+            error_details = traceback.format_exc()
             print(f"Ошибка при записи лога: {e}")
+            print(f"Детали ошибки: {error_details}")
+            raise  # Пробрасываем исключение для обработки выше
 

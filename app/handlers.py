@@ -167,14 +167,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Получаем username пользователя
         username = update.message.from_user.username or update.message.from_user.first_name or "unknown"
         
-        # Сохраняем лог в БД
+        # Сохраняем лог в БД (всегда, независимо от результата оценки)
         try:
+            print(f"Попытка записи лога: username={username}, question_id={current_question['id']}")
             db.log_question_answer(
                 username=username,
                 question_id=current_question['id']
             )
+            print(f"Лог успешно записан в БД")
         except Exception as e:
-            print(f"Ошибка при записи лога: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
+            # Не прерываем выполнение, но логируем детально
         
         # Очищаем текущий вопрос из контекста
         del context.user_data['current_question']
