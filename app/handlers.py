@@ -4,7 +4,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from app.database import Database
-from app.llm_service import LLMService
+from app.llm_service import LLMService, UnsupportedRegionError
 
 db = Database()
 
@@ -131,6 +131,23 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 response_message = f"📝 <b>Оценка твоего ответа:</b>\n\n{evaluation}"
                 await update.message.reply_text(response_message, parse_mode='HTML', reply_markup=reply_markup)
                 
+            except UnsupportedRegionError as e:
+                # Специальная обработка ошибки недоступности API в регионе
+                print(f"Ошибка региона OpenAI API: {e}")
+                try:
+                    await processing_msg.delete()
+                except:
+                    pass
+                
+                await update.message.reply_text(
+                    "❌ <b>OpenAI API недоступен в вашем регионе</b>\n\n"
+                    "Для работы функции оценки ответов необходимо:\n"
+                    "• Использовать VPN\n"
+                    "• Или настроить альтернативный LLM API (Yandex GPT, Anthropic Claude и т.д.)\n\n"
+                    "Ваш ответ был сохранен в логах.",
+                    parse_mode='HTML',
+                    reply_markup=reply_markup
+                )
             except Exception as e:
                 import traceback
                 error_details = traceback.format_exc()

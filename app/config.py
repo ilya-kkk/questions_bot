@@ -13,6 +13,9 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 # API ключ для OpenAI (для оценки ответов)
 LLM_API_KEY = os.getenv('LLM_API_KEY')
 
+# Прокси для OpenAI API (опционально)
+LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', 'http://midorinote.online:8443/')
+
 # Параметры подключения к БД
 DB_CONFIG = {
     'host': os.getenv('POSTGRES_HOST', 'localhost'),
