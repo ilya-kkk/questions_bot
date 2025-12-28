@@ -4,8 +4,16 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from app.database import Database
+from app.llm_service import LLMService
 
 db = Database()
+
+# Инициализируем LLM сервис (может быть None если ключ не установлен)
+try:
+    llm_service = LLMService()
+except ValueError:
+    llm_service = None
+    print("Предупреждение: LLM_API_KEY не установлен, оценка ответов будет недоступна")
 
 # Создаем Reply Keyboard (кнопки рядом с полем ввода)
 reply_keyboard = [
@@ -19,7 +27,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         welcome_message = (
             "👋 Привет вкатун! Я бот чтобы ты наконецто заботал все вопросы и прошел собес на 300к наносек.\n\n"
-            "Используй кнопку ниже, чтобы получить случайный вопрос!"
         )
         await update.message.reply_text(welcome_message, reply_markup=reply_markup)
     except Exception as e:
@@ -38,14 +45,18 @@ async def random_question_callback(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text("❌ Не удалось получить вопрос из базы данных")
         return
     
+    # Сохраняем вопрос в context для последующей обработки ответа
+    context.user_data['current_question'] = {
+        'id': question['id'],
+        'question': question['question'],
+        'topic': question.get('topic', ''),
+        'answer': question.get('answer', '')
+    }
+    
     message = f"❓ <b>Вопрос #{question['id']}</b>\n\n"
     message += f"<b>Тема:</b> {question.get('topic', 'Не указана')}\n\n"
     message += f"<b>Вопрос:</b>\n{question['question']}\n\n"
-    
-    if question.get('answer'):
-        message += f"<b>Ответ:</b>\n{question['answer']}"
-    else:
-        message += "⚠️ Ответ отсутствует"
+    message += "💬 <b>Отправь свой ответ текстом, и я оценю его!</b>"
     
     # Создаем кнопку для обновления сообщения
     keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
@@ -58,6 +69,57 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Обработчик текстовых сообщений (для Reply Keyboard кнопок)"""
     text = update.message.text
     
+    # Проверяем, есть ли активный вопрос в контексте (пользователь отвечает на вопрос)
+    if 'current_question' in context.user_data:
+        # Это ответ пользователя на вопрос
+        current_question = context.user_data['current_question']
+        user_answer = text
+        
+        # Отправляем сообщение о том, что обрабатываем ответ
+        processing_msg = await update.message.reply_text("⏳ Оцениваю твой ответ...", reply_markup=reply_markup)
+        
+        # Оцениваем ответ через LLM
+        if llm_service:
+            try:
+                evaluation = llm_service.evaluate_answer(
+                    question=current_question['question'],
+                    user_answer=user_answer,
+                    correct_answer=current_question.get('answer')
+                )
+                
+                # Формируем сообщение с оценкой
+                response_message = f"📝 <b>Оценка твоего ответа:</b>\n\n{evaluation}"
+                await processing_msg.edit_text(response_message, parse_mode='HTML')
+                
+            except Exception as e:
+                await processing_msg.edit_text(
+                    f"❌ Ошибка при оценке ответа: {str(e)}",
+                    parse_mode='HTML'
+                )
+        else:
+            await processing_msg.edit_text(
+                "❌ Оценка ответов недоступна: LLM_API_KEY не установлен",
+                parse_mode='HTML'
+            )
+        
+        # Получаем username пользователя
+        username = update.message.from_user.username or update.message.from_user.first_name or "unknown"
+        
+        # Сохраняем лог в БД
+        try:
+            db.log_question_answer(
+                username=username,
+                question_id=current_question['id']
+            )
+        except Exception as e:
+            print(f"Ошибка при записи лога: {e}")
+        
+        # Очищаем текущий вопрос из контекста
+        del context.user_data['current_question']
+        
+        return
+    
+    # Обработка кнопки "Случайный вопрос"
     if text == "🎲 Случайный вопрос":
         question = db.get_random_question()
         
@@ -68,14 +130,18 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
+        # Сохраняем вопрос в context для последующей обработки ответа
+        context.user_data['current_question'] = {
+            'id': question['id'],
+            'question': question['question'],
+            'topic': question.get('topic', ''),
+            'answer': question.get('answer', '')
+        }
+        
         message = f"❓ <b>Вопрос #{question['id']}</b>\n\n"
         message += f"<b>Тема:</b> {question.get('topic', 'Не указана')}\n\n"
         message += f"<b>Вопрос:</b>\n{question['question']}\n\n"
-        
-        if question.get('answer'):
-            message += f"<b>Ответ:</b>\n{question['answer']}"
-        else:
-            message += "⚠️ Ответ отсутствует"
+        message += "💬 <b>Отправь свой ответ текстом, и я оценю его!</b>"
         
         await update.message.reply_text(message, parse_mode='HTML', reply_markup=reply_markup)
     else:

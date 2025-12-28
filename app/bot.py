@@ -13,6 +13,7 @@ from telegram.ext import (
     ContextTypes
 )
 from app.config import BOT_TOKEN
+from app.database import Database
 from app.handlers import (
     start,
     random_question_callback,
@@ -33,6 +34,14 @@ def main():
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN не установлен! Создайте файл .env и добавьте BOT_TOKEN")
         return
+    
+    # Создаем таблицу logs если её нет
+    db = Database()
+    try:
+        db.create_logs_table()
+        logger.info("Таблица logs проверена/создана")
+    except Exception as e:
+        logger.warning(f"Не удалось создать таблицу logs: {e}")
     
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()

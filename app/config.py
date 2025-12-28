@@ -10,6 +10,9 @@ load_dotenv()
 # Токен бота (получить у @BotFather)
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
+# API ключ для OpenAI (для оценки ответов)
+LLM_API_KEY = os.getenv('LLM_API_KEY')
+
 # Параметры подключения к БД
 DB_CONFIG = {
     'host': os.getenv('POSTGRES_HOST', 'localhost'),

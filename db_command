@@ -1,0 +1,1 @@
+psql -h 192.168.0.162 -p 5432 -U app_user -d app_db
