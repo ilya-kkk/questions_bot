@@ -1,0 +1,46 @@
+# Директории с данными БД
+postgres/
+*.db
+*.sqlite
+*.sqlite3
+
+# Виртуальное окружение
+venv/
+env/
+.venv/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Логи
+*.log
+logs/
+
+# Временные файлы
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Docker файлы
+docker-compose.yaml
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# CI/CD
+.github/
+
+# Другие ненужные файлы
+*.md
+.DS_Store
+Thumbs.db
+
