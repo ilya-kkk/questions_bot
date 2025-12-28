@@ -13,9 +13,16 @@ jobs:
     
     steps:
       - name: Checkout and pull latest changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd /home/cm5/questions_bot
           echo "Получаем последние изменения из репозитория..."
+          # Настраиваем аутентификацию через токен
+          git config --local credential.helper store
+          echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+          # Обновляем remote URL для использования токена
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git fetch origin
           git pull origin main || git pull origin master || true
           echo "Последний коммит: $(git log -1 --oneline)"
