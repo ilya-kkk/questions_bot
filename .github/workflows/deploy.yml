@@ -12,22 +12,29 @@ jobs:
     runs-on: self-hosted
     
     steps:
-      - name: Stop containers and clean postgres before checkout
+      - name: Stop containers and clean workspace before checkout
         run: |
           echo "Останавливаем контейнеры перед checkout..."
           # Checkout создает поддиректорию с именем репозитория
           REPO_PATH="/home/cm5/actions-runner/_work/questions_bot/questions_bot"
           if [ -d "$REPO_PATH" ]; then
             cd "$REPO_PATH" && docker compose down 2>/dev/null || true
-            echo "Исправление прав доступа на postgres/..."
-            sudo chown -R $(whoami):$(whoami) "$REPO_PATH/postgres" 2>/dev/null || true
+            echo "Исправление прав доступа на всю директорию..."
+            sudo chown -R $(whoami):$(whoami) "$REPO_PATH" 2>/dev/null || true
+            echo "Удаление postgres/ и других файлов..."
             sudo rm -rf "$REPO_PATH/postgres" 2>/dev/null || true
+            sudo rm -rf "$REPO_PATH/app" 2>/dev/null || true
+            sudo rm -f "$REPO_PATH/docker-compose.yaml" 2>/dev/null || true
+            sudo rm -f "$REPO_PATH/Dockerfile" 2>/dev/null || true
+            sudo rm -f "$REPO_PATH/requirements.txt" 2>/dev/null || true
+            sudo rm -f "$REPO_PATH/raw.json" 2>/dev/null || true
+            sudo rm -rf "$REPO_PATH/.github" 2>/dev/null || true
+            echo "Директория очищена для checkout"
           fi
           echo "Подготовка завершена"
       
       - name: Checkout code
         uses: actions/checkout@v4
-        continue-on-error: true
       
       - name: Verify checkout and list files
         working-directory: ${{ github.workspace }}
@@ -42,8 +49,10 @@ jobs:
             echo "✓ docker-compose.yml найден"
           else
             echo "✗ Файл docker-compose не найден!"
-            echo "Список всех файлов:"
-            find . -maxdepth 1 -type f | head -20
+            echo "Проверка наличия основных файлов проекта:"
+            ls -la | grep -E "(docker|Dockerfile|app|requirements)" || echo "Файлы проекта не найдены"
+            echo "Попытка повторного checkout..."
+            exit 1
           fi
       
       - name: Clean repository and fix permissions after checkout
