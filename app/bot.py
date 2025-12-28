@@ -15,12 +15,7 @@ from telegram.ext import (
 from app.config import BOT_TOKEN
 from app.handlers import (
     start,
-    help_command,
-    random_question,
     random_question_callback,
-    search_questions,
-    show_topics,
-    handle_message,
     error_handler
 )
 
@@ -43,15 +38,6 @@ def main():
     
     # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("random", random_question))
-    application.add_handler(CommandHandler("search", search_questions))
-    application.add_handler(CommandHandler("topics", show_topics))
-    
-    # Регистрируем обработчик текстовых сообщений
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-    )
     
     # Регистрируем обработчик callback кнопок
     application.add_handler(

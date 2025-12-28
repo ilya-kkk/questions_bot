@@ -10,10 +10,15 @@ db = Database()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
-    welcome_message = (
-        " Привет вкатун! Я бот чтобы ты наконецто заботал все вопросы и прошел собес на 300к наносек.\n\n"
-    )
-    await update.message.reply_text(welcome_message)
+    try:
+        welcome_message = (
+            "👋 Привет вкатун! Я бот чтобы ты наконецто заботал все вопросы и прошел собес на 300к наносек.\n\n"
+        )
+        await update.message.reply_text(welcome_message)
+    except Exception as e:
+        print(f"Ошибка в start handler: {e}")
+        if update and update.message:
+            await update.message.reply_text("❌ Произошла ошибка при обработке команды")
 
 async def random_question_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатия на кнопку 'Случайный вопрос'"""
