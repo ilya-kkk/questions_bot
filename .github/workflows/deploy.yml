@@ -11,10 +11,13 @@ jobs:
   deploy:
     runs-on: self-hosted
     
-    steps:      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Stop and remove containers
-        working-directory: ${{ github.workspace }}
         run: |
+          cd /home/cm5/actions-runner/_work/questions_bot
           echo "Текущая директория: $(pwd)"
           echo "Содержимое директории:"
           ls -la
@@ -27,8 +30,8 @@ jobs:
           docker compose down || true
       
       - name: Build and start containers
-        working-directory: ${{ github.workspace }}
         run: |
+          cd /home/cm5/actions-runner/_work/questions_bot
           echo "Текущая директория: $(pwd)"
           if [ -f "docker-compose.yaml" ]; then
             docker compose -f docker-compose.yaml up -d --build
@@ -41,14 +44,14 @@ jobs:
           echo "Контейнеры запущены"
 
       - name: Show running containers
-        working-directory: ${{ github.workspace }}
         run: |
+          cd /home/cm5/actions-runner/_work/questions_bot
           echo "Статус контейнеров:"
           docker compose ps
       
       - name: Show container logs (last 20 lines)
-        working-directory: ${{ github.workspace }}
         run: |
+          cd /home/cm5/actions-runner/_work/questions_bot
           echo "Последние логи приложения:"
           docker compose logs --tail=20 app || true
 
