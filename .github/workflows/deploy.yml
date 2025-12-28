@@ -12,19 +12,35 @@ jobs:
     runs-on: self-hosted
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Stop and remove containers
         working-directory: ${{ github.workspace }}
         run: |
           echo "Текущая директория: $(pwd)"
+          echo "Содержимое директории:"
+          ls -la
           echo "Проверка наличия docker-compose.yaml..."
-          ls -la docker-compose.yaml || echo "docker-compose.yaml не найден!"
+          if [ ! -f "docker-compose.yaml" ] && [ ! -f "docker-compose.yml" ]; then
+            echo "ОШИБКА: docker-compose файл не найден!"
+            exit 1
+          fi
           echo "Останавливаем контейнеры..."
           docker compose down || true
       
       - name: Build and start containers
         working-directory: ${{ github.workspace }}
         run: |
-          docker compose up -d --build
+          echo "Текущая директория: $(pwd)"
+          if [ -f "docker-compose.yaml" ]; then
+            docker compose -f docker-compose.yaml up -d --build
+          elif [ -f "docker-compose.yml" ]; then
+            docker compose -f docker-compose.yml up -d --build
+          else
+            echo "ОШИБКА: docker-compose файл не найден!"
+            exit 1
+          fi
           echo "Контейнеры запущены"
 
       - name: Show running containers
