@@ -12,8 +12,30 @@ jobs:
     runs-on: self-hosted
     
     steps:
+      - name: Stop containers before checkout (if exists)
+        run: |
+          echo "Останавливаем контейнеры перед checkout..."
+          WORKSPACE_PATH="/home/cm5/actions-runner/_work/questions_bot/questions_bot"
+          if [ -d "$WORKSPACE_PATH" ]; then
+            cd "$WORKSPACE_PATH" && docker compose down 2>/dev/null || true
+            echo "Исправление прав доступа на postgres/..."
+            sudo chown -R $(whoami):$(whoami) "$WORKSPACE_PATH/postgres" 2>/dev/null || true
+            sudo rm -rf "$WORKSPACE_PATH/postgres" 2>/dev/null || true
+          fi
+          echo "Подготовка завершена"
+      
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          clean: false
+      
+      - name: Clean repository and fix permissions
+        run: |
+          echo "Очистка репозитория и исправление прав доступа..."
+          sudo rm -rf postgres/ 2>/dev/null || true
+          rm -rf app/__pycache__ __pycache__ .pytest_cache .env 2>/dev/null || true
+          sudo chown -R $(whoami):$(whoami) . 2>/dev/null || true
+          echo "Очистка завершена"
       
       - name: Copy .env file
         run: |
@@ -27,7 +49,7 @@ jobs:
           docker compose down || true
           echo "Контейнеры остановлены"
           echo "Очистка кэша Python и исправление прав доступа..."
-          sudo rm -rf app/__pycache__ __pycache__ .pytest_cache || true
+          sudo rm -rf app/__pycache__ __pycache__ .pytest_cache postgres/ || true
           sudo chown -R $(whoami):$(whoami) . || true
           echo "Очистка завершена"
       
