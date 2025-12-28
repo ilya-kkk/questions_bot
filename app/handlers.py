@@ -121,9 +121,15 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 
                 print(f"Получена оценка от LLM: {evaluation[:100]}...")
                 
+                # Удаляем сообщение "Оцениваю..." и отправляем новое с результатом
+                try:
+                    await processing_msg.delete()
+                except:
+                    pass  # Игнорируем ошибку удаления, если сообщение уже удалено
+                
                 # Формируем сообщение с оценкой
                 response_message = f"📝 <b>Оценка твоего ответа:</b>\n\n{evaluation}"
-                await processing_msg.edit_text(response_message, parse_mode='HTML')
+                await update.message.reply_text(response_message, parse_mode='HTML', reply_markup=reply_markup)
                 
             except Exception as e:
                 import traceback
@@ -133,14 +139,29 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 # Ограничиваем длину сообщения об ошибке для Telegram
                 if len(error_msg) > 200:
                     error_msg = error_msg[:200] + "..."
-                await processing_msg.edit_text(
+                
+                # Удаляем сообщение "Оцениваю..." и отправляем новое с ошибкой
+                try:
+                    await processing_msg.delete()
+                except:
+                    pass
+                
+                await update.message.reply_text(
                     f"❌ Ошибка при оценке ответа: {error_msg}",
-                    parse_mode='HTML'
+                    parse_mode='HTML',
+                    reply_markup=reply_markup
                 )
         else:
-            await processing_msg.edit_text(
+            # Удаляем сообщение "Оцениваю..." и отправляем новое
+            try:
+                await processing_msg.delete()
+            except:
+                pass
+            
+            await update.message.reply_text(
                 "❌ Оценка ответов недоступна: LLM_API_KEY не установлен",
-                parse_mode='HTML'
+                parse_mode='HTML',
+                reply_markup=reply_markup
             )
         
         # Получаем username пользователя
