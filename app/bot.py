@@ -16,6 +16,7 @@ from app.config import BOT_TOKEN
 from app.handlers import (
     start,
     random_question_callback,
+    handle_text_message,
     error_handler
 )
 
@@ -39,7 +40,10 @@ def main():
     # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start))
     
-    # Регистрируем обработчик callback кнопок
+    # Регистрируем обработчик текстовых сообщений (для Reply Keyboard)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
+    
+    # Регистрируем обработчик callback кнопок (для Inline Keyboard)
     application.add_handler(
         CallbackQueryHandler(random_question_callback, pattern="^random_question$")
     )
