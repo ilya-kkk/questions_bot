@@ -11,7 +11,16 @@ jobs:
   deploy:
     runs-on: self-hosted
     
-    steps:      
+    steps:
+      - name: Checkout and pull latest changes
+        run: |
+          cd /home/cm5/questions_bot
+          echo "Получаем последние изменения из репозитория..."
+          git fetch origin
+          git pull origin main || git pull origin master || true
+          echo "Текущая ветка: $(git branch --show-current)"
+          echo "Последний коммит: $(git log -1 --oneline)"
+      
       - name: Stop and remove containers
         run: |
           cd /home/cm5/questions_bot
