@@ -11,10 +11,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
+    steps:      
       - name: Stop and remove containers
         run: |
           cd /home/cm5/actions-runner/_work/questions_bot
