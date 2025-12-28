@@ -10,48 +10,18 @@ import sys
 import os
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения из .env файла только если они не установлены
-# В docker-compose переменные уже установлены, поэтому load_dotenv не нужен
-# Но оставляем для локального запуска
-if not os.getenv('DB_HOST') and not os.getenv('POSTGRES_HOST'):
-    load_dotenv()
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 # Параметры подключения к БД из переменных окружения
-# Используем те же переменные, что и в app/config.py для консистентности
-# Приоритет: DB_* переменные (как в app/config.py), затем POSTGRES_* (для обратной совместимости)
-def get_db_config():
-    """Получает конфигурацию БД из переменных окружения"""
-    host = os.getenv('DB_HOST')
-    if not host:
-        host = os.getenv('POSTGRES_HOST', 'localhost')
-    
-    port = os.getenv('DB_PORT')
-    if not port:
-        port = os.getenv('POSTGRES_PORT', '5432')
-    
-    database = os.getenv('DB_NAME')
-    if not database:
-        database = os.getenv('POSTGRES_DB', 'questions_db')
-    
-    user = os.getenv('DB_USER')
-    if not user:
-        user = os.getenv('POSTGRES_USER', 'postgres')
-    
-    password = os.getenv('DB_PASSWORD')
-    if not password:
-        password = os.getenv('POSTGRES_PASSWORD', 'postgres')
-    
-    config = {
-        'host': host,
-        'port': int(port),
-        'database': database,
-        'user': user,
-        'password': password,
-        'sslmode': 'disable'  # Отключаем SSL для подключения внутри Docker сети
-    }
-    
-    print(f"Подключение к БД: host={config['host']}, database={config['database']}, user={config['user']}")
-    return config
+DB_CONFIG = {
+    'host': os.getenv('POSTGRES_HOST'),
+    'port': int(os.getenv('POSTGRES_PORT', 5432)),
+    'database': os.getenv('POSTGRES_DB'),
+    'user': os.getenv('POSTGRES_USER'),
+    'password': os.getenv('POSTGRES_PASSWORD'),
+    'sslmode': 'disable'  # Отключаем SSL для подключения внутри Docker сети
+}
 
 def create_table(cursor):
     """Создает таблицу questions если её нет"""
@@ -77,9 +47,7 @@ def import_data(json_file='raw.json'):
         data = json.load(f)
     
     print(f"Загружено {len(data)} записей из {json_file}")
-    
-    # Получаем конфигурацию БД
-    DB_CONFIG = get_db_config()
+    print(f"Подключение к БД: host={DB_CONFIG['host']}, database={DB_CONFIG['database']}, user={DB_CONFIG['user']}")
     
     # Подключаемся к БД
     conn = None
