@@ -11,10 +11,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
+    steps:      
       - name: Stop and remove containers
         working-directory: ${{ github.workspace }}
         run: |
