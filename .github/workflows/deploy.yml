@@ -44,7 +44,11 @@ jobs:
           echo ".env файл скопирован в $(pwd)"
       
       - name: Stop and remove containers
+        working-directory: ${{ github.workspace }}
         run: |
+          echo "Текущая директория: $(pwd)"
+          echo "Проверка наличия docker-compose.yaml..."
+          ls -la docker-compose.yaml || echo "docker-compose.yaml не найден!"
           echo "Останавливаем контейнеры..."
           docker compose down || true
           echo "Контейнеры остановлены"
@@ -59,7 +63,11 @@ jobs:
           docker image prune -f || true
       
       - name: Build and start containers
+        working-directory: ${{ github.workspace }}
         run: |
+          echo "Текущая директория: $(pwd)"
+          echo "Проверка наличия docker-compose.yaml..."
+          ls -la docker-compose.yaml || (echo "ОШИБКА: docker-compose.yaml не найден!" && exit 1)
           echo "Собираем и запускаем контейнеры..."
           docker compose up -d --build
           echo "Контейнеры запущены"
@@ -68,11 +76,13 @@ jobs:
           echo "Права исправлены"
       
       - name: Show running containers
+        working-directory: ${{ github.workspace }}
         run: |
           echo "Статус контейнеров:"
           docker compose ps
       
       - name: Show container logs (last 20 lines)
+        working-directory: ${{ github.workspace }}
         run: |
           echo "Последние логи приложения:"
           docker compose logs --tail=20 app || true
