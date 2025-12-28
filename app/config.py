@@ -12,8 +12,8 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 # Параметры подключения к БД
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST'),
-    'port': int(os.getenv('POSTGRES_PORT', 5432)),
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', '5432')),
     'database': os.getenv('POSTGRES_DB'),
     'user': os.getenv('POSTGRES_USER'),
     'password': os.getenv('POSTGRES_PASSWORD'),
