@@ -26,6 +26,10 @@ jobs:
           echo "Останавливаем контейнеры..."
           docker compose down || true
           echo "Контейнеры остановлены"
+          echo "Очистка кэша Python и исправление прав доступа..."
+          sudo rm -rf app/__pycache__ __pycache__ .pytest_cache || true
+          sudo chown -R $(whoami):$(whoami) . || true
+          echo "Очистка завершена"
       
       - name: Remove old images (optional cleanup)
         run: |
@@ -37,6 +41,9 @@ jobs:
           echo "Собираем и запускаем контейнеры..."
           docker compose up -d --build
           echo "Контейнеры запущены"
+          echo "Исправление прав доступа на созданные файлы..."
+          sudo chown -R $(whoami):$(whoami) app/__pycache__ 2>/dev/null || true
+          echo "Права исправлены"
       
       - name: Show running containers
         run: |
