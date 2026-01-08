@@ -1,10 +1,13 @@
 """
 Обработчики команд и сообщений для телеграм бота
 """
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from app.database import Database
 from app.llm_service import LLMService, UnsupportedRegionError
+
+logger = logging.getLogger(__name__)
 
 db = Database()
 
@@ -133,7 +136,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 
             except UnsupportedRegionError as e:
                 # Специальная обработка ошибки недоступности API в регионе
-                print(f"Ошибка региона OpenAI API: {e}")
+                import traceback
+                error_details = traceback.format_exc()
+                username = update.message.from_user.username or update.message.from_user.first_name or "unknown"
+                user_id = update.message.from_user.id
+                
+                logger.error(
+                    f"OpenAI API недоступен в регионе. "
+                    f"Пользователь: {username} (ID: {user_id}), "
+                    f"Вопрос ID: {current_question['id']}, "
+                    f"Ошибка: {str(e)}\n"
+                    f"Детали ошибки:\n{error_details}"
+                )
+                
                 try:
                     await processing_msg.delete()
                 except:

@@ -2,10 +2,13 @@
 Модуль для работы с OpenAI API для оценки ответов пользователей
 """
 import os
+import logging
 import openai
 import httpx
 from typing import Optional
 from app.config import LLM_API_KEY, LLM_PROXY_URL
+
+logger = logging.getLogger(__name__)
 
 
 class UnsupportedRegionError(Exception):
@@ -92,18 +95,52 @@ class LLMService:
                 'unsupported_country' in error_msg_lower or 
                 'unsupported_country_region_territory' in error_msg_lower or
                 'country, region, or territory not supported' in error_msg_lower):
+                import traceback
+                error_details = traceback.format_exc()
+                logger.error(
+                    f"OpenAI API недоступен в регионе (APIError). "
+                    f"Ошибка: {error_str}, "
+                    f"Тип ошибки: {type(e).__name__}\n"
+                    f"Детали ошибки:\n{error_details}"
+                )
                 raise UnsupportedRegionError(
                     "OpenAI API недоступен в вашем регионе. "
                     "Используйте VPN или альтернативный LLM API (Yandex GPT, Anthropic Claude и т.д.)"
                 )
+            # Логируем другие ошибки API
+            import traceback
+            error_details = traceback.format_exc()
+            logger.error(
+                f"Ошибка OpenAI API (не связанная с регионом). "
+                f"Ошибка: {error_str}, "
+                f"Тип ошибки: {type(e).__name__}\n"
+                f"Детали ошибки:\n{error_details}"
+            )
             raise  # Пробрасываем другие ошибки API
         except Exception as e:
             # Обрабатываем другие типы ошибок (например, из response)
             error_str = str(e)
             if 'unsupported_country' in error_str.lower() or '403' in error_str:
+                import traceback
+                error_details = traceback.format_exc()
+                logger.error(
+                    f"OpenAI API недоступен в регионе (общая ошибка). "
+                    f"Ошибка: {error_str}, "
+                    f"Тип ошибки: {type(e).__name__}\n"
+                    f"Детали ошибки:\n{error_details}"
+                )
                 raise UnsupportedRegionError(
                     "OpenAI API недоступен в вашем регионе. "
                     "Используйте VPN или альтернативный LLM API (Yandex GPT, Anthropic Claude и т.д.)"
                 )
+            # Логируем другие ошибки
+            import traceback
+            error_details = traceback.format_exc()
+            logger.error(
+                f"Неожиданная ошибка при вызове OpenAI API. "
+                f"Ошибка: {error_str}, "
+                f"Тип ошибки: {type(e).__name__}\n"
+                f"Детали ошибки:\n{error_details}"
+            )
             raise
 
