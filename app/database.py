@@ -17,12 +17,29 @@ class Database:
     def get_connection(self):
         """Создает и возвращает соединение с БД"""
         # Отладочный вывод для проверки конфигурации
-        print(f"[DEBUG] Подключение к БД: host={self.config.get('host')}, database={self.config.get('database')}, user={self.config.get('user')}")
-        if not self.config.get('database'):
+        db_name = self.config.get('database')
+        db_user = self.config.get('user')
+        
+        print(f"[DEBUG] Подключение к БД: host={self.config.get('host')}, database={db_name}, user={db_user}")
+        
+        if not db_name:
             raise ValueError(f"ОШИБКА: database не установлен! config={self.config}")
-        if self.config.get('database') == self.config.get('user'):
-            raise ValueError(f"ОШИБКА: database совпадает с user! Это неправильно! database={self.config.get('database')}, user={self.config.get('user')}")
-        return psycopg2.connect(**self.config)   
+        
+        if db_name == db_user:
+            raise ValueError(
+                f"ОШИБКА: database совпадает с user! Это неправильно! "
+                f"database={db_name}, user={db_user}. "
+                f"Проверьте переменные окружения POSTGRES_DB и POSTGRES_USER"
+            )
+        
+        # Убеждаемся, что используем правильный параметр для psycopg2
+        # psycopg2 принимает и 'database' и 'dbname', но мы явно используем 'database'
+        connection_params = self.config.copy()
+        
+        # Дополнительная проверка перед подключением
+        print(f"[DEBUG] Финальные параметры подключения: database={connection_params.get('database')}, user={connection_params.get('user')}")
+        
+        return psycopg2.connect(**connection_params)   
     
     def get_random_question(self) -> Optional[Dict]:
         """Получает случайный вопрос"""

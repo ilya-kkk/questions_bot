@@ -20,22 +20,37 @@ LLM_API_KEY = os.getenv('LLM_API_KEY')
 LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', '')
 
 # Параметры подключения к БД
+# ВАЖНО: Используем POSTGRES_DB для имени базы данных, а не POSTGRES_USER!
+postgres_db = os.getenv('POSTGRES_DB')
+postgres_user = os.getenv('POSTGRES_USER')
+
+# Проверяем, что POSTGRES_DB установлен и не равен POSTGRES_USER
+if not postgres_db:
+    raise ValueError(
+        "КРИТИЧЕСКАЯ ОШИБКА: POSTGRES_DB не установлен! "
+        "Проверьте файл .env и убедитесь, что POSTGRES_DB=app_db"
+    )
+
+if postgres_db == postgres_user:
+    raise ValueError(
+        f"КРИТИЧЕСКАЯ ОШИБКА: POSTGRES_DB совпадает с POSTGRES_USER! "
+        f"POSTGRES_DB={postgres_db}, POSTGRES_USER={postgres_user}. "
+        f"Это неправильно! POSTGRES_DB должно быть именем базы данных (app_db), "
+        f"а POSTGRES_USER - именем пользователя (app_user)"
+    )
+
 DB_CONFIG = {
     'host': os.getenv('POSTGRES_HOST', 'localhost'),
     'port': int(os.getenv('POSTGRES_PORT', '5432')),
-    'database': os.getenv('POSTGRES_DB'),  # ВАЖНО: Используем POSTGRES_DB, а не POSTGRES_USER!
-    'user': os.getenv('POSTGRES_USER'),
+    'database': postgres_db,  # Явно используем переменную, чтобы избежать путаницы
+    'user': postgres_user,
     'password': os.getenv('POSTGRES_PASSWORD'),
     'sslmode': 'disable'  # Отключаем SSL для подключения внутри Docker сети
 }
 
-# Проверка: убеждаемся, что database не равен user (это была бы ошибка)
-if DB_CONFIG.get('database') and DB_CONFIG.get('user') and DB_CONFIG['database'] == DB_CONFIG['user']:
-    raise ValueError(
-        f"КРИТИЧЕСКАЯ ОШИБКА: database совпадает с user! "
-        f"database={DB_CONFIG['database']}, user={DB_CONFIG['user']}. "
-        f"Проверьте переменные окружения POSTGRES_DB и POSTGRES_USER"
-    )
+# Дополнительная проверка после создания конфига
+print(f"[CONFIG] DB_CONFIG создан: host={DB_CONFIG['host']}, database={DB_CONFIG['database']}, user={DB_CONFIG['user']}")
+
 
 # Валидация обязательных переменных окружения
 required_vars = {

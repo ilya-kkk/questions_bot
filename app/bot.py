@@ -35,6 +35,18 @@ def main():
         logger.error("BOT_TOKEN не установлен! Создайте файл .env и добавьте BOT_TOKEN")
         return
     
+    # Проверяем конфигурацию БД перед запуском
+    from app.config import DB_CONFIG
+    logger.info(f"Конфигурация БД: host={DB_CONFIG.get('host')}, database={DB_CONFIG.get('database')}, user={DB_CONFIG.get('user')}")
+    
+    if not DB_CONFIG.get('database'):
+        logger.error("POSTGRES_DB не установлен! Проверьте файл .env")
+        return
+    
+    if DB_CONFIG.get('database') == DB_CONFIG.get('user'):
+        logger.error(f"ОШИБКА: database совпадает с user! database={DB_CONFIG.get('database')}, user={DB_CONFIG.get('user')}")
+        return
+    
     # Создаем таблицу user_logs если её нет
     db = Database()
     try:
