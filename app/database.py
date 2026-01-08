@@ -16,6 +16,12 @@ class Database:
     
     def get_connection(self):
         """Создает и возвращает соединение с БД"""
+        # Отладочный вывод для проверки конфигурации
+        print(f"[DEBUG] Подключение к БД: host={self.config.get('host')}, database={self.config.get('database')}, user={self.config.get('user')}")
+        if not self.config.get('database'):
+            raise ValueError(f"ОШИБКА: database не установлен! config={self.config}")
+        if self.config.get('database') == self.config.get('user'):
+            raise ValueError(f"ОШИБКА: database совпадает с user! Это неправильно! database={self.config.get('database')}, user={self.config.get('user')}")
         return psycopg2.connect(**self.config)   
     
     def get_random_question(self) -> Optional[Dict]:
@@ -38,23 +44,48 @@ class Database:
             return None
     
     def create_logs_table(self):
-        """Создает таблицу user_logs если её нет"""
+        """Создает таблицу user_logs если её нет (или использует существующую таблицу logs)"""
         try:
             conn = self.get_connection()
             try:
                 cursor = conn.cursor()
+                # Проверяем, существует ли таблица logs
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS user_logs (
-                        id SERIAL PRIMARY KEY,
-                        timestamp TIMESTAMP DEFAULT NOW(),
-                        username TEXT NOT NULL,
-                        question_id INTEGER NOT NULL,
-                        FOREIGN KEY (question_id) REFERENCES questions(id)
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'logs'
                     )
                 """)
-                conn.commit()
-                cursor.close()
-                print("Таблица user_logs успешно создана/проверена")
+                logs_exists = cursor.fetchone()[0]
+                
+                # Проверяем, существует ли таблица user_logs
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'user_logs'
+                    )
+                """)
+                user_logs_exists = cursor.fetchone()[0]
+                
+                # Если существует таблица logs, используем её, иначе создаем user_logs
+                if logs_exists:
+                    print("Таблица logs уже существует, используем её")
+                elif not user_logs_exists:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS user_logs (
+                            id SERIAL PRIMARY KEY,
+                            timestamp TIMESTAMP DEFAULT NOW(),
+                            username TEXT NOT NULL,
+                            question_id INTEGER NOT NULL,
+                            FOREIGN KEY (question_id) REFERENCES questions(id)
+                        )
+                    """)
+                    conn.commit()
+                    print("Таблица user_logs успешно создана/проверена")
+                else:
+                    print("Таблица user_logs уже существует")
             except Exception as e:
                 conn.rollback()
                 raise
@@ -79,18 +110,30 @@ class Database:
             conn = self.get_connection()
             try:
                 cursor = conn.cursor()
+                # Проверяем, какая таблица существует: logs или user_logs
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'logs'
+                    )
+                """)
+                logs_exists = cursor.fetchone()[0]
+                
+                table_name = 'logs' if logs_exists else 'user_logs'
+                
                 if timestamp:
                     cursor.execute(
-                        """
-                        INSERT INTO user_logs (timestamp, username, question_id)
+                        f"""
+                        INSERT INTO {table_name} (timestamp, username, question_id)
                         VALUES (%s, %s, %s)
                         """,
                         (timestamp, username, question_id)
                     )
                 else:
                     cursor.execute(
-                        """
-                        INSERT INTO user_logs (username, question_id)
+                        f"""
+                        INSERT INTO {table_name} (username, question_id)
                         VALUES (%s, %s)
                         """,
                         (username, question_id)

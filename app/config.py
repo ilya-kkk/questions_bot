@@ -23,11 +23,19 @@ LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', '')
 DB_CONFIG = {
     'host': os.getenv('POSTGRES_HOST', 'localhost'),
     'port': int(os.getenv('POSTGRES_PORT', '5432')),
-    'database': os.getenv('POSTGRES_DB'),
+    'database': os.getenv('POSTGRES_DB'),  # ВАЖНО: Используем POSTGRES_DB, а не POSTGRES_USER!
     'user': os.getenv('POSTGRES_USER'),
     'password': os.getenv('POSTGRES_PASSWORD'),
     'sslmode': 'disable'  # Отключаем SSL для подключения внутри Docker сети
 }
+
+# Проверка: убеждаемся, что database не равен user (это была бы ошибка)
+if DB_CONFIG.get('database') and DB_CONFIG.get('user') and DB_CONFIG['database'] == DB_CONFIG['user']:
+    raise ValueError(
+        f"КРИТИЧЕСКАЯ ОШИБКА: database совпадает с user! "
+        f"database={DB_CONFIG['database']}, user={DB_CONFIG['user']}. "
+        f"Проверьте переменные окружения POSTGRES_DB и POSTGRES_USER"
+    )
 
 # Валидация обязательных переменных окружения
 required_vars = {
