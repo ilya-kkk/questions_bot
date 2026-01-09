@@ -22,11 +22,24 @@ from app.handlers import (
 )
 
 # Настройка логирования
+# Настраиваем логирование для вывода в stdout (видно в docker logs)
+import sys
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    stream=sys.stdout,  # Явно указываем stdout для docker logs
+    force=True  # Перезаписываем существующую конфигурацию
 )
 logger = logging.getLogger(__name__)
+
+# Настраиваем все логгеры на вывод в stdout
+for logger_name in ['app', 'app.bot', 'app.handlers', 'app.llm_service', 'app.database']:
+    log = logging.getLogger(logger_name)
+    log.setLevel(logging.INFO)
+    log.handlers = []  # Очищаем существующие обработчики
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    log.addHandler(handler)
 
 
 def main():

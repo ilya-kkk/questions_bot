@@ -2,6 +2,7 @@
 Модуль для работы с OpenAI/OpenRouter API для оценки ответов пользователей
 """
 import os
+import sys
 import logging
 import openai
 import httpx
@@ -9,6 +10,11 @@ from typing import Optional
 from app.config import LLM_API_KEY, LLM_PROXY_URL, LLM_TIMEOUT
 
 logger = logging.getLogger(__name__)
+
+# Функция для немедленного вывода в docker logs
+def print_flush(*args, **kwargs):
+    """Обертка над print() с немедленным flush для docker logs"""
+    print(*args, **kwargs, flush=True, file=sys.stdout)
 
 
 class UnsupportedRegionError(Exception):
@@ -65,7 +71,7 @@ class LLMService:
         
         if proxy_url:
             api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
-            print(f"Используется прокси для {api_name}: {proxy_url}")
+            print_flush(f"Используется прокси для {api_name}: {proxy_url}")
             # Создаем HTTP клиент с прокси и увеличенным таймаутом
             http_client = httpx.Client(
                 proxies=proxy_url,
@@ -75,7 +81,7 @@ class LLMService:
             client_kwargs['http_client'] = http_client
         else:
             api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
-            print(f"Прокси не настроен. Запросы идут напрямую к {api_name}.")
+            print_flush(f"Прокси не настроен. Запросы идут напрямую к {api_name}.")
             # Создаем HTTP клиент без прокси, но с таймаутом
             http_client = httpx.Client(
                 timeout=http_timeout,
@@ -91,14 +97,14 @@ class LLMService:
         
         # Проверяем фактический таймаут HTTP клиента
         timeout_info = f"connect=30.0s, read={LLM_TIMEOUT}s, write=30.0s, pool=30.0s"
-        print(f"[LLM] OpenAI клиент инициализирован. Настроенный таймаут: {timeout_info}")
+        print_flush(f"[LLM] OpenAI клиент инициализирован. Настроенный таймаут: {timeout_info}")
         if hasattr(self.client, '_client') and hasattr(self.client._client, '_client'):
             actual_timeout = getattr(self.client._client._client, 'timeout', None)
             if actual_timeout:
-                print(f"[LLM] Фактический таймаут HTTP клиента: {actual_timeout}")
+                print_flush(f"[LLM] Фактический таймаут HTTP клиента: {actual_timeout}")
                 logger.info(f"Фактический таймаут HTTP клиента: {actual_timeout}")
             else:
-                print(f"[LLM] Не удалось определить фактический таймаут HTTP клиента")
+                print_flush(f"[LLM] Не удалось определить фактический таймаут HTTP клиента")
                 logger.warning("Не удалось определить фактический таймаут HTTP клиента")
         
         logger.info(f"OpenAI клиент инициализирован. Настроенный таймаут: {timeout_info}")
@@ -131,7 +137,7 @@ class LLMService:
         # Логируем начало запроса
         import time
         start_time = time.time()
-        print(f"[LLM] Начало запроса к LLM API (таймаут: {LLM_TIMEOUT} сек)")
+        print_flush(f"[LLM] Начало запроса к LLM API (таймаут: {LLM_TIMEOUT} сек)")
         logger.info(f"Начало запроса к LLM API (таймаут: {LLM_TIMEOUT} сек)")
         
         try:
@@ -148,7 +154,7 @@ class LLMService:
             )
             
             elapsed_time = time.time() - start_time
-            print(f"[LLM] Запрос к LLM API выполнен успешно за {elapsed_time:.2f} секунд")
+            print_flush(f"[LLM] Запрос к LLM API выполнен успешно за {elapsed_time:.2f} секунд")
             logger.info(f"Запрос к LLM API выполнен успешно за {elapsed_time:.2f} секунд")
             
             if not response.choices or not response.choices[0].message:
@@ -168,8 +174,8 @@ class LLMService:
                 f"Ошибка: {str(e)}, "
                 f"Тип ошибки: {type(e).__name__}"
             )
-            print(f"[LLM ERROR] {error_msg}")
-            print(f"[LLM ERROR] Детали ошибки:\n{error_details}")
+            print_flush(f"[LLM ERROR] {error_msg}")
+            print_flush(f"[LLM ERROR] Детали ошибки:\n{error_details}")
             logger.error(
                 f"Таймаут при запросе к LLM API. "
                 f"Прошло времени: {elapsed_time:.2f} секунд, "

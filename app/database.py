@@ -1,11 +1,17 @@
 """
 Модуль для работы с базой данных
 """
+import sys
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from typing import Optional, List, Dict
 from datetime import datetime
 from app.config import DB_CONFIG
+
+# Настраиваем вывод print() в stdout с немедленным flush для docker logs
+def print_flush(*args, **kwargs):
+    """Обертка над print() с немедленным flush для docker logs"""
+    print(*args, **kwargs, flush=True, file=sys.stdout)
 
 
 class Database:
@@ -20,7 +26,7 @@ class Database:
         db_name = self.config.get('database')
         db_user = self.config.get('user')
         
-        print(f"[DEBUG] Подключение к БД: host={self.config.get('host')}, database={db_name}, user={db_user}")
+        print_flush(f"[DEBUG] Подключение к БД: host={self.config.get('host')}, database={db_name}, user={db_user}")
         
         if not db_name:
             raise ValueError(f"ОШИБКА: database не установлен! config={self.config}")
@@ -37,7 +43,7 @@ class Database:
         connection_params = self.config.copy()
         
         # Дополнительная проверка перед подключением
-        print(f"[DEBUG] Финальные параметры подключения: database={connection_params.get('database')}, user={connection_params.get('user')}")
+        print_flush(f"[DEBUG] Финальные параметры подключения: database={connection_params.get('database')}, user={connection_params.get('user')}")
         
         return psycopg2.connect(**connection_params)   
     
@@ -57,7 +63,7 @@ class Database:
                     result = cursor.fetchone()
                     return dict(result) if result else None
         except psycopg2.Error as e:
-            print(f"Ошибка при получении случайного вопроса: {e}")
+            print_flush(f"Ошибка при получении случайного вопроса: {e}")
             return None
     
     def create_logs_table(self):
@@ -88,7 +94,7 @@ class Database:
                 
                 # Если существует таблица logs, используем её, иначе создаем user_logs
                 if logs_exists:
-                    print("Таблица logs уже существует, используем её")
+                    print_flush("Таблица logs уже существует, используем её")
                     # Проверяем и добавляем колонку user_answer, если её нет
                     cursor.execute("""
                         SELECT column_name 
@@ -100,7 +106,7 @@ class Database:
                     if cursor.fetchone() is None:
                         cursor.execute("ALTER TABLE logs ADD COLUMN IF NOT EXISTS user_answer TEXT")
                         conn.commit()
-                        print("Колонка user_answer добавлена в таблицу logs")
+                        print_flush("Колонка user_answer добавлена в таблицу logs")
                 elif not user_logs_exists:
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS user_logs (
@@ -113,9 +119,9 @@ class Database:
                         )
                     """)
                     conn.commit()
-                    print("Таблица user_logs успешно создана/проверена")
+                    print_flush("Таблица user_logs успешно создана/проверена")
                 else:
-                    print("Таблица user_logs уже существует")
+                    print_flush("Таблица user_logs уже существует")
                     # Проверяем и добавляем колонку user_answer, если её нет
                     cursor.execute("""
                         SELECT column_name 
@@ -127,7 +133,7 @@ class Database:
                     if cursor.fetchone() is None:
                         cursor.execute("ALTER TABLE user_logs ADD COLUMN IF NOT EXISTS user_answer TEXT")
                         conn.commit()
-                        print("Колонка user_answer добавлена в таблицу user_logs")
+                        print_flush("Колонка user_answer добавлена в таблицу user_logs")
             except Exception as e:
                 conn.rollback()
                 raise
@@ -136,8 +142,8 @@ class Database:
         except psycopg2.Error as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"Ошибка при создании таблицы user_logs: {e}")
-            print(f"Детали ошибки: {error_details}")
+            print_flush(f"Ошибка при создании таблицы user_logs: {e}")
+            print_flush(f"Детали ошибки: {error_details}")
     
     def log_question_answer(self, username: str, question_id: int, user_answer: Optional[str] = None, timestamp: Optional[datetime] = None):
         """
@@ -181,14 +187,14 @@ class Database:
                         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS user_answer TEXT")
                         conn.commit()
                         has_user_answer_column = True  # Обновляем флаг после успешного добавления
-                        print(f"Колонка user_answer добавлена в таблицу {table_name}")
+                        print_flush(f"Колонка user_answer добавлена в таблицу {table_name}")
                     except Exception as e:
-                        print(f"Не удалось добавить колонку user_answer: {e}")
+                        print_flush(f"Не удалось добавить колонку user_answer: {e}")
                         conn.rollback()
                 
                 # Логируем что собираемся сохранить
                 user_answer_preview = user_answer[:50] + "..." if user_answer and len(user_answer) > 50 else (user_answer or "None")
-                print(f"[DB] Сохранение лога: table={table_name}, username={username}, question_id={question_id}, has_column={has_user_answer_column}, user_answer_len={len(user_answer) if user_answer else 0}")
+                print_flush(f"[DB] Сохранение лога: table={table_name}, username={username}, question_id={question_id}, has_column={has_user_answer_column}, user_answer_len={len(user_answer) if user_answer else 0}")
                 
                 # Вставляем данные с учетом наличия колонки user_answer
                 if timestamp:
@@ -200,7 +206,7 @@ class Database:
                             """,
                             (timestamp, username, question_id, user_answer)
                         )
-                        print(f"[DB] INSERT с timestamp и user_answer: {user_answer_preview}")
+                        print_flush(f"[DB] INSERT с timestamp и user_answer: {user_answer_preview}")
                     else:
                         cursor.execute(
                             f"""
@@ -209,7 +215,7 @@ class Database:
                             """,
                             (timestamp, username, question_id)
                         )
-                        print(f"[DB] INSERT с timestamp БЕЗ user_answer (колонка отсутствует)")
+                        print_flush(f"[DB] INSERT с timestamp БЕЗ user_answer (колонка отсутствует)")
                 else:
                     if has_user_answer_column:
                         cursor.execute(
@@ -219,7 +225,7 @@ class Database:
                             """,
                             (username, question_id, user_answer)
                         )
-                        print(f"[DB] INSERT БЕЗ timestamp с user_answer: {user_answer_preview}")
+                        print_flush(f"[DB] INSERT БЕЗ timestamp с user_answer: {user_answer_preview}")
                     else:
                         cursor.execute(
                             f"""
@@ -228,11 +234,11 @@ class Database:
                             """,
                             (username, question_id)
                         )
-                        print(f"[DB] INSERT БЕЗ timestamp БЕЗ user_answer (колонка отсутствует)")
+                        print_flush(f"[DB] INSERT БЕЗ timestamp БЕЗ user_answer (колонка отсутствует)")
                 
                 conn.commit()
                 cursor.close()
-                print(f"[DB] Лог успешно записан: username={username}, question_id={question_id}, user_answer={'сохранен (' + str(len(user_answer)) + ' символов)' if user_answer else 'не указан'}")
+                print_flush(f"[DB] Лог успешно записан: username={username}, question_id={question_id}, user_answer={'сохранен (' + str(len(user_answer)) + ' символов)' if user_answer else 'не указан'}")
             except Exception as e:
                 conn.rollback()
                 raise
@@ -241,7 +247,7 @@ class Database:
         except psycopg2.Error as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"Ошибка при записи лога: {e}")
-            print(f"Детали ошибки: {error_details}")
+            print_flush(f"Ошибка при записи лога: {e}")
+            print_flush(f"Детали ошибки: {error_details}")
             raise  # Пробрасываем исключение для обработки выше
 

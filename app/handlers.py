@@ -3,6 +3,7 @@
 """
 import asyncio
 import logging
+import sys
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.error import TimedOut as TelegramTimedOut
 from telegram.ext import ContextTypes
@@ -11,6 +12,18 @@ from app.llm_service import LLMService, UnsupportedRegionError, LLMTimeoutError
 
 logger = logging.getLogger(__name__)
 
+# Настраиваем вывод логов в stdout для docker logs
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+# Функция для немедленного вывода в docker logs
+def print_flush(*args, **kwargs):
+    """Обертка над print() с немедленным flush для docker logs"""
+    print(*args, **kwargs, flush=True, file=sys.stdout)
+
 db = Database()
 
 # Инициализируем LLM сервис (может быть None если ключ не установлен)
@@ -18,7 +31,7 @@ try:
     llm_service = LLMService()
 except ValueError:
     llm_service = None
-    print("Предупреждение: LLM_API_KEY не установлен, оценка ответов будет недоступна")
+    print_flush("Предупреждение: LLM_API_KEY не установлен, оценка ответов будет недоступна")
 
 # Создаем Reply Keyboard (кнопки рядом с полем ввода)
 reply_keyboard = [
@@ -35,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(welcome_message, reply_markup=reply_markup)
     except Exception as e:
-        print(f"Ошибка в start handler: {e}")
+        print_flush(f"Ошибка в start handler: {e}")
         if update and update.message:
             await update.message.reply_text("❌ Произошла ошибка при обработке команды", reply_markup=reply_markup)
 
@@ -119,7 +132,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             try:
                 import time
                 start_time = time.time()
-                print(f"Оцениваю ответ пользователя на вопрос #{current_question['id']}")
+                print_flush(f"Оцениваю ответ пользователя на вопрос #{current_question['id']}")
                 # Обертываем синхронный вызов в asyncio.to_thread, чтобы не блокировать event loop
                 # Это предотвращает таймауты при длительных запросах к LLM API
                 evaluation = await asyncio.to_thread(
@@ -130,7 +143,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 )
                 
                 llm_time = time.time() - start_time
-                print(f"[HANDLER] Получена оценка от LLM за {llm_time:.2f} сек: {evaluation[:100]}...")
+                print_flush(f"[HANDLER] Получена оценка от LLM за {llm_time:.2f} сек: {evaluation[:100]}...")
                 logger.info(f"LLM оценка получена за {llm_time:.2f} сек для вопроса #{current_question['id']}")
                 
                 # Формируем сообщение с оценкой
@@ -139,41 +152,41 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 # Редактируем сообщение "Оцениваю..." на результат
                 try:
                     edit_start_time = time.time()
-                    print(f"[HANDLER] Редактирую сообщение с результатом оценки (длина: {len(response_message)} символов)")
+                    print_flush(f"[HANDLER] Редактирую сообщение с результатом оценки (длина: {len(response_message)} символов)")
                     await processing_msg.edit_text(response_message, parse_mode='HTML', reply_markup=reply_markup)
                     edit_time = time.time() - edit_start_time
-                    print(f"[HANDLER] Сообщение успешно отредактировано за {edit_time:.2f} сек")
+                    print_flush(f"[HANDLER] Сообщение успешно отредактировано за {edit_time:.2f} сек")
                     logger.info(f"Сообщение отредактировано за {edit_time:.2f} сек")
                 except TelegramTimedOut as timeout_error:
                     # Специальная обработка таймаута Telegram API
-                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения в Telegram: {timeout_error}")
+                    print_flush(f"[HANDLER ERROR] Таймаут при редактировании сообщения в Telegram: {timeout_error}")
                     logger.error(f"Таймаут при редактировании сообщения в Telegram: {timeout_error}")
                     
                     # Пытаемся отредактировать упрощенное сообщение без форматирования
                     try:
                         simple_message = f"📝 Оценка твоего ответа:\n\n{evaluation[:1000]}"  # Ограничиваем длину
-                        print(f"[HANDLER] Пытаюсь отредактировать упрощенное сообщение (длина: {len(simple_message)} символов)")
+                        print_flush(f"[HANDLER] Пытаюсь отредактировать упрощенное сообщение (длина: {len(simple_message)} символов)")
                         await processing_msg.edit_text(simple_message, reply_markup=reply_markup)
-                        print("[HANDLER] Упрощенное сообщение отредактировано успешно после таймаута")
+                        print_flush("[HANDLER] Упрощенное сообщение отредактировано успешно после таймаута")
                     except Exception as retry_error:
-                        print(f"[HANDLER ERROR] Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
+                        print_flush(f"[HANDLER ERROR] Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
                         logger.error(f"Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
                         # В крайнем случае просто логируем ошибку, но не прерываем выполнение
                 except Exception as edit_error:
                     # Обработка других ошибок при редактировании сообщения
                     error_str = str(edit_error)
                     error_type = type(edit_error).__name__
-                    print(f"[HANDLER ERROR] Ошибка при редактировании сообщения в Telegram: {error_type}: {error_str}")
+                    print_flush(f"[HANDLER ERROR] Ошибка при редактировании сообщения в Telegram: {error_type}: {error_str}")
                     logger.error(f"Ошибка при редактировании сообщения в Telegram: {error_type}: {error_str}")
                     
                     # Пытаемся отредактировать упрощенное сообщение без форматирования
                     try:
                         simple_message = f"📝 Оценка твоего ответа:\n\n{evaluation[:1000]}"  # Ограничиваем длину
-                        print(f"[HANDLER] Пытаюсь отредактировать упрощенное сообщение после ошибки")
+                        print_flush(f"[HANDLER] Пытаюсь отредактировать упрощенное сообщение после ошибки")
                         await processing_msg.edit_text(simple_message, reply_markup=reply_markup)
-                        print("[HANDLER] Упрощенное сообщение отредактировано успешно после ошибки")
+                        print_flush("[HANDLER] Упрощенное сообщение отредактировано успешно после ошибки")
                     except Exception as retry_error:
-                        print(f"[HANDLER ERROR] Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
+                        print_flush(f"[HANDLER ERROR] Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
                         logger.error(f"Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
                         # В крайнем случае просто логируем ошибку, но не прерываем выполнение
                 
@@ -201,14 +214,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     "Ваш ответ был сохранен в логах."
                 )
                 try:
-                    print(f"[HANDLER] Редактирую сообщение об ошибке региона")
+                    print_flush(f"[HANDLER] Редактирую сообщение об ошибке региона")
                     await processing_msg.edit_text(error_message, parse_mode='HTML', reply_markup=reply_markup)
                     print(f"[HANDLER] Сообщение об ошибке региона успешно отредактировано")
                 except TelegramTimedOut as timeout_error:
-                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения об ошибке региона: {timeout_error}")
+                    print_flush(f"[HANDLER ERROR] Таймаут при редактировании сообщения об ошибке региона: {timeout_error}")
                     logger.error(f"Таймаут при редактировании сообщения об ошибке региона: {timeout_error}")
                 except Exception as edit_error:
-                    print(f"[HANDLER ERROR] Не удалось отредактировать сообщение об ошибке региона: {edit_error}")
+                    print_flush(f"[HANDLER ERROR] Не удалось отредактировать сообщение об ошибке региона: {edit_error}")
                     logger.error(f"Не удалось отредактировать сообщение об ошибке региона: {edit_error}")
             except LLMTimeoutError as e:
                 # Специальная обработка ошибки таймаута
@@ -223,8 +236,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     f"Вопрос ID: {current_question['id']}, "
                     f"Ошибка: {str(e)}"
                 )
-                print(f"[HANDLER ERROR] {error_msg}")
-                print(f"[HANDLER ERROR] Детали ошибки:\n{error_details}")
+                print_flush(f"[HANDLER ERROR] {error_msg}")
+                print_flush(f"[HANDLER ERROR] Детали ошибки:\n{error_details}")
                 logger.error(
                     f"Таймаут при оценке ответа. "
                     f"Пользователь: {username} (ID: {user_id}), "
@@ -244,11 +257,11 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     "Ваш ответ был сохранен в логах."
                 )
                 try:
-                    print(f"[HANDLER] Редактирую сообщение о таймауте LLM")
+                    print_flush(f"[HANDLER] Редактирую сообщение о таймауте LLM")
                     await processing_msg.edit_text(timeout_message, parse_mode='HTML', reply_markup=reply_markup)
                     print(f"[HANDLER] Сообщение о таймауте LLM успешно отредактировано")
                 except TelegramTimedOut as timeout_error:
-                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения о таймауте LLM: {timeout_error}")
+                    print_flush(f"[HANDLER ERROR] Таймаут при редактировании сообщения о таймауте LLM: {timeout_error}")
                     logger.error(f"Таймаут при редактировании сообщения о таймауте LLM: {timeout_error}")
                 except Exception as edit_error:
                     print(f"[HANDLER ERROR] Не удалось отредактировать сообщение о таймауте: {edit_error}")
@@ -257,8 +270,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 import traceback
                 error_details = traceback.format_exc()
                 error_msg = str(e)
-                print(f"[HANDLER ERROR] Ошибка при оценке ответа: {error_msg}")
-                print(f"[HANDLER ERROR] Детали ошибки:\n{error_details}")
+                print_flush(f"[HANDLER ERROR] Ошибка при оценке ответа: {error_msg}")
+                print_flush(f"[HANDLER ERROR] Детали ошибки:\n{error_details}")
                 # Ограничиваем длину сообщения об ошибке для Telegram
                 if len(error_msg) > 200:
                     error_msg = error_msg[:200] + "..."
@@ -266,7 +279,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 # Редактируем сообщение "Оцениваю..." на сообщение об ошибке
                 error_message = f"❌ Ошибка при оценке ответа: {error_msg}"
                 try:
-                    print(f"[HANDLER] Редактирую сообщение об общей ошибке")
+                    print_flush(f"[HANDLER] Редактирую сообщение об общей ошибке")
                     await processing_msg.edit_text(error_message, parse_mode='HTML', reply_markup=reply_markup)
                     print(f"[HANDLER] Сообщение об общей ошибке успешно отредактировано")
                 except TelegramTimedOut as timeout_error:
@@ -279,7 +292,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Редактируем сообщение "Оцениваю..." на сообщение об отсутствии API ключа
             no_key_message = "❌ Оценка ответов недоступна: LLM_API_KEY не установлен"
             try:
-                print(f"[HANDLER] Редактирую сообщение об отсутствии API ключа")
+                    print_flush(f"[HANDLER] Редактирую сообщение об отсутствии API ключа")
                 await processing_msg.edit_text(no_key_message, parse_mode='HTML', reply_markup=reply_markup)
                 print(f"[HANDLER] Сообщение об отсутствии API ключа успешно отредактировано")
             except TelegramTimedOut as timeout_error:
@@ -296,19 +309,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Делаем это в блоке finally, чтобы гарантировать сохранение даже при ошибках
         try:
             user_answer_preview = user_answer[:50] + "..." if user_answer and len(user_answer) > 50 else (user_answer or "None")
-            print(f"[HANDLER] Попытка записи лога: username={username}, question_id={current_question['id']}, user_answer_len={len(user_answer) if user_answer else 0}, user_answer_preview={user_answer_preview}")
-            print(f"[HANDLER] user_answer type: {type(user_answer)}, value: {repr(user_answer)}")
+            print_flush(f"[HANDLER] Попытка записи лога: username={username}, question_id={current_question['id']}, user_answer_len={len(user_answer) if user_answer else 0}, user_answer_preview={user_answer_preview}")
+            print_flush(f"[HANDLER] user_answer type: {type(user_answer)}, value: {repr(user_answer)}")
             
             db.log_question_answer(
                 username=username,
                 question_id=current_question['id'],
                 user_answer=user_answer  # Передаем ответ пользователя
             )
-            print(f"[HANDLER] Лог успешно записан в БД")
+            print_flush(f"[HANDLER] Лог успешно записан в БД")
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"[HANDLER ERROR] КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
+            print_flush(f"[HANDLER ERROR] КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
             logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
             # Не прерываем выполнение, но логируем детально
         finally:
@@ -328,8 +341,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
     import traceback
     error_details = traceback.format_exc()
-    print(f"Ошибка при обработке обновления: {context.error}")
-    print(f"Детали ошибки: {error_details}")
+    print_flush(f"Ошибка при обработке обновления: {context.error}")
+    print_flush(f"Детали ошибки: {error_details}")
     
     if update and update.message:
         try:

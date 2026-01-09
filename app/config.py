@@ -2,7 +2,13 @@
 Конфигурация телеграм бота
 """
 import os
+import sys
 from dotenv import load_dotenv
+
+# Функция для немедленного вывода в docker logs
+def print_flush(*args, **kwargs):
+    """Обертка над print() с немедленным flush для docker logs"""
+    print(*args, **kwargs, flush=True, file=sys.stdout)
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -50,7 +56,7 @@ DB_CONFIG = {
 }
 
 # Дополнительная проверка после создания конфига
-print(f"[CONFIG] DB_CONFIG создан: host={DB_CONFIG['host']}, database={DB_CONFIG['database']}, user={DB_CONFIG['user']}")
+print_flush(f"[CONFIG] DB_CONFIG создан: host={DB_CONFIG['host']}, database={DB_CONFIG['database']}, user={DB_CONFIG['user']}")
 
 
 # Валидация обязательных переменных окружения

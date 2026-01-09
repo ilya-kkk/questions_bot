@@ -43,6 +43,7 @@ services:
       - PGDATABASE=${POSTGRES_DB:-app_db}  # База данных по умолчанию для psql и других утилит
       - BOT_TOKEN=${BOT_TOKEN}
       - LLM_PROXY_URL=http://172.19.0.1:8118  # HTTP прокси через Privoxy для доступа к OpenAI API
+      - PYTHONUNBUFFERED=1  # Отключаем буферизацию stdout/stderr для немедленного вывода в docker logs
     volumes:
       - ./app:/app/app
       - ./.env:/app/.env
