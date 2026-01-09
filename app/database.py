@@ -89,6 +89,18 @@ class Database:
                 # Если существует таблица logs, используем её, иначе создаем user_logs
                 if logs_exists:
                     print("Таблица logs уже существует, используем её")
+                    # Проверяем и добавляем колонку user_answer, если её нет
+                    cursor.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'logs' 
+                        AND column_name = 'user_answer'
+                    """)
+                    if cursor.fetchone() is None:
+                        cursor.execute("ALTER TABLE logs ADD COLUMN IF NOT EXISTS user_answer TEXT")
+                        conn.commit()
+                        print("Колонка user_answer добавлена в таблицу logs")
                 elif not user_logs_exists:
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS user_logs (
@@ -96,6 +108,7 @@ class Database:
                             timestamp TIMESTAMP DEFAULT NOW(),
                             username TEXT NOT NULL,
                             question_id INTEGER NOT NULL,
+                            user_answer TEXT,
                             FOREIGN KEY (question_id) REFERENCES questions(id)
                         )
                     """)
@@ -103,6 +116,18 @@ class Database:
                     print("Таблица user_logs успешно создана/проверена")
                 else:
                     print("Таблица user_logs уже существует")
+                    # Проверяем и добавляем колонку user_answer, если её нет
+                    cursor.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'user_logs' 
+                        AND column_name = 'user_answer'
+                    """)
+                    if cursor.fetchone() is None:
+                        cursor.execute("ALTER TABLE user_logs ADD COLUMN IF NOT EXISTS user_answer TEXT")
+                        conn.commit()
+                        print("Колонка user_answer добавлена в таблицу user_logs")
             except Exception as e:
                 conn.rollback()
                 raise
@@ -114,13 +139,14 @@ class Database:
             print(f"Ошибка при создании таблицы user_logs: {e}")
             print(f"Детали ошибки: {error_details}")
     
-    def log_question_answer(self, username: str, question_id: int, timestamp: Optional[datetime] = None):
+    def log_question_answer(self, username: str, question_id: int, user_answer: Optional[str] = None, timestamp: Optional[datetime] = None):
         """
         Записывает лог ответа пользователя на вопрос
         
         Args:
             username: Имя пользователя Telegram
             question_id: ID вопроса
+            user_answer: Ответ пользователя (опционально)
             timestamp: Временная метка (если None, используется NOW())
         """
         try:
@@ -139,25 +165,65 @@ class Database:
                 
                 table_name = 'logs' if logs_exists else 'user_logs'
                 
+                # Проверяем, есть ли колонка user_answer в таблице
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public' 
+                    AND table_name = %s 
+                    AND column_name = 'user_answer'
+                """, (table_name,))
+                has_user_answer_column = cursor.fetchone() is not None
+                
+                # Если колонки нет, добавляем её (для существующих таблиц)
+                if not has_user_answer_column:
+                    try:
+                        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS user_answer TEXT")
+                        conn.commit()
+                        has_user_answer_column = True  # Обновляем флаг после успешного добавления
+                        print(f"Колонка user_answer добавлена в таблицу {table_name}")
+                    except Exception as e:
+                        print(f"Не удалось добавить колонку user_answer: {e}")
+                        conn.rollback()
+                
+                # Вставляем данные с учетом наличия колонки user_answer
                 if timestamp:
-                    cursor.execute(
-                        f"""
-                        INSERT INTO {table_name} (timestamp, username, question_id)
-                        VALUES (%s, %s, %s)
-                        """,
-                        (timestamp, username, question_id)
-                    )
+                    if has_user_answer_column:
+                        cursor.execute(
+                            f"""
+                            INSERT INTO {table_name} (timestamp, username, question_id, user_answer)
+                            VALUES (%s, %s, %s, %s)
+                            """,
+                            (timestamp, username, question_id, user_answer)
+                        )
+                    else:
+                        cursor.execute(
+                            f"""
+                            INSERT INTO {table_name} (timestamp, username, question_id)
+                            VALUES (%s, %s, %s)
+                            """,
+                            (timestamp, username, question_id)
+                        )
                 else:
-                    cursor.execute(
-                        f"""
-                        INSERT INTO {table_name} (username, question_id)
-                        VALUES (%s, %s)
-                        """,
-                        (username, question_id)
-                    )
+                    if has_user_answer_column:
+                        cursor.execute(
+                            f"""
+                            INSERT INTO {table_name} (username, question_id, user_answer)
+                            VALUES (%s, %s, %s)
+                            """,
+                            (username, question_id, user_answer)
+                        )
+                    else:
+                        cursor.execute(
+                            f"""
+                            INSERT INTO {table_name} (username, question_id)
+                            VALUES (%s, %s)
+                            """,
+                            (username, question_id)
+                        )
                 conn.commit()
                 cursor.close()
-                print(f"Лог успешно записан: username={username}, question_id={question_id}")
+                print(f"Лог успешно записан: username={username}, question_id={question_id}, user_answer={'сохранен' if user_answer else 'не указан'}")
             except Exception as e:
                 conn.rollback()
                 raise

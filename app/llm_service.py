@@ -6,13 +6,18 @@ import logging
 import openai
 import httpx
 from typing import Optional
-from app.config import LLM_API_KEY, LLM_PROXY_URL
+from app.config import LLM_API_KEY, LLM_PROXY_URL, LLM_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
 
 class UnsupportedRegionError(Exception):
     """Исключение для случая, когда OpenAI API недоступен в регионе"""
+    pass
+
+
+class LLMTimeoutError(Exception):
+    """Исключение для случая таймаута при запросе к API"""
     pass
 
 
@@ -48,17 +53,30 @@ class LLMService:
             # Проверяем системные переменные окружения (если VLESS работает на уровне системы)
             proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY') or os.getenv('https_proxy') or os.getenv('http_proxy')
         
+        # Создаем HTTP клиент с увеличенным таймаутом
+        # Используем более длинный таймаут для надежности, особенно при использовании прокси
+        http_timeout = httpx.Timeout(
+            connect=10.0,  # Таймаут подключения
+            read=LLM_TIMEOUT,  # Таймаут чтения ответа
+            write=10.0,  # Таймаут записи
+            pool=10.0  # Таймаут получения соединения из пула
+        )
+        
         if proxy_url:
             api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
             print(f"Используется прокси для {api_name}: {proxy_url}")
-            # Создаем HTTP клиент с прокси
+            # Создаем HTTP клиент с прокси и увеличенным таймаутом
             client_kwargs['http_client'] = httpx.Client(
                 proxies=proxy_url,
-                timeout=30.0
+                timeout=http_timeout
             )
         else:
             api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
             print(f"Прокси не настроен. Запросы идут напрямую к {api_name}.")
+            # Создаем HTTP клиент без прокси, но с таймаутом
+            client_kwargs['http_client'] = httpx.Client(
+                timeout=http_timeout
+            )
         
         self.client = openai.OpenAI(**client_kwargs)
     
@@ -96,6 +114,7 @@ class LLMService:
                 ],
                 temperature=0.7,
                 max_tokens=200  # Ограничиваем длину ответа для короткого совета
+                # Таймаут контролируется через http_client в __init__
             )
             
             if not response.choices or not response.choices[0].message:
@@ -103,6 +122,21 @@ class LLMService:
             
             return response.choices[0].message.content.strip()
         
+        except (httpx.TimeoutException, TimeoutError) as e:
+            # Обработка ошибок таймаута
+            import traceback
+            error_details = traceback.format_exc()
+            logger.error(
+                f"Таймаут при запросе к LLM API. "
+                f"Ошибка: {str(e)}, "
+                f"Тип ошибки: {type(e).__name__}\n"
+                f"Детали ошибки:\n{error_details}"
+            )
+            raise LLMTimeoutError(
+                f"Запрос к LLM API превысил таймаут ({LLM_TIMEOUT} секунд). "
+                f"Возможные причины: медленное соединение, проблемы с прокси, перегрузка API. "
+                f"Попробуйте позже или проверьте настройки прокси."
+            )
         except openai.APIError as e:
             # Обработка ошибки 403 - регион не поддерживается
             error_str = str(e)

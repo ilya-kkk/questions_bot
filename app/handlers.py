@@ -5,7 +5,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from app.database import Database
-from app.llm_service import LLMService, UnsupportedRegionError
+from app.llm_service import LLMService, UnsupportedRegionError, LLMTimeoutError
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,37 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     parse_mode='HTML',
                     reply_markup=reply_markup
                 )
+            except LLMTimeoutError as e:
+                # Специальная обработка ошибки таймаута
+                import traceback
+                error_details = traceback.format_exc()
+                username = update.message.from_user.username or update.message.from_user.first_name or "unknown"
+                user_id = update.message.from_user.id
+                
+                logger.error(
+                    f"Таймаут при оценке ответа. "
+                    f"Пользователь: {username} (ID: {user_id}), "
+                    f"Вопрос ID: {current_question['id']}, "
+                    f"Ошибка: {str(e)}\n"
+                    f"Детали ошибки:\n{error_details}"
+                )
+                
+                try:
+                    await processing_msg.delete()
+                except:
+                    pass
+                
+                await update.message.reply_text(
+                    "⏱️ <b>Превышено время ожидания ответа от LLM API</b>\n\n"
+                    "Возможные причины:\n"
+                    "• Медленное соединение\n"
+                    "• Проблемы с прокси\n"
+                    "• Перегрузка API сервера\n\n"
+                    "Попробуйте позже или проверьте настройки прокси.\n\n"
+                    "Ваш ответ был сохранен в логах.",
+                    parse_mode='HTML',
+                    reply_markup=reply_markup
+                )
             except Exception as e:
                 import traceback
                 error_details = traceback.format_exc()
@@ -201,10 +232,11 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # Сохраняем лог в БД (всегда, независимо от результата оценки)
         try:
-            print(f"Попытка записи лога: username={username}, question_id={current_question['id']}")
+            print(f"Попытка записи лога: username={username}, question_id={current_question['id']}, user_answer={user_answer[:50] if user_answer else 'None'}...")
             db.log_question_answer(
                 username=username,
-                question_id=current_question['id']
+                question_id=current_question['id'],
+                user_answer=user_answer
             )
             print(f"Лог успешно записан в БД")
         except Exception as e:

@@ -75,3 +75,6 @@ BOT_SETTINGS = {
     'timeout': 30  # Таймаут ожидания ответа в секундах
 }
 
+# Настройки LLM API
+LLM_TIMEOUT = int(os.getenv('LLM_TIMEOUT', '90'))  # Таймаут для запросов к LLM API в секундах (по умолчанию 90)
+
