@@ -157,8 +157,7 @@ async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             [
                 InlineKeyboardButton("✅ Запомнил", callback_data=f"learned:{question_id}"),
                 InlineKeyboardButton("🔁 Повторю", callback_data=f"repeat:{question_id}")
-            ],
-            [InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]
+            ]
         ]
         inline_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(message, parse_mode='HTML', reply_markup=inline_markup)
@@ -197,9 +196,7 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
         inserted = db.mark_question_learned(user.id, user.username, question_id)
         status_text = "✅ Вопрос отмечен как выученный" if inserted else "✅ Уже был отмечен как выученный"
 
-        keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
-        inline_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(f"{status_text}\n\nНажми, чтобы получить новый вопрос.", reply_markup=inline_markup)
+        await query.edit_message_text(f"{status_text}\n\nИспользуй кнопку '🎲 Случайный вопрос', чтобы получить новый вопрос.")
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
@@ -223,9 +220,7 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.answer()
 
-        keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
-        inline_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("Ок, повторим позже. Нажми, чтобы взять другой вопрос.", reply_markup=inline_markup)
+        await query.edit_message_text("Ок, повторим позже. Используй кнопку '🎲 Случайный вопрос', чтобы взять другой вопрос.")
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()

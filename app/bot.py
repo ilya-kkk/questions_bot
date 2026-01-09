@@ -15,7 +15,6 @@ from telegram.ext import (
 from app.config import BOT_TOKEN
 from app.handlers import (
     start,
-    random_question_callback,
     show_answer_callback,
     mark_learned_callback,
     repeat_callback,
@@ -84,7 +83,6 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     
     # Callback кнопки
-    application.add_handler(CallbackQueryHandler(random_question_callback, pattern="^random_question$"))
     application.add_handler(CallbackQueryHandler(show_answer_callback, pattern="^show_answer:\\d+$"))
     application.add_handler(CallbackQueryHandler(mark_learned_callback, pattern="^learned:\\d+$"))
     application.add_handler(CallbackQueryHandler(repeat_callback, pattern="^repeat:\\d+$"))
