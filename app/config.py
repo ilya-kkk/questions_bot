@@ -10,7 +10,8 @@ load_dotenv()
 # Токен бота (получить у @BotFather)
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
-# API ключ для OpenAI (для оценки ответов)
+# API ключ для OpenAI/OpenRouter (для оценки ответов)
+# OpenRouter ключи начинаются с sk-or-v1-, OpenAI ключи начинаются с sk-
 LLM_API_KEY = os.getenv('LLM_API_KEY')
 
 # Прокси для OpenAI API (опционально)

@@ -1,5 +1,5 @@
 """
-Модуль для работы с OpenAI API для оценки ответов пользователей
+Модуль для работы с OpenAI/OpenRouter API для оценки ответов пользователей
 """
 import os
 import logging
@@ -17,14 +17,30 @@ class UnsupportedRegionError(Exception):
 
 
 class LLMService:
-    """Класс для работы с OpenAI API"""
+    """Класс для работы с OpenAI/OpenRouter API"""
     
     def __init__(self):
         if not LLM_API_KEY:
             raise ValueError("LLM_API_KEY не установлен в переменных окружения")
         
         # Настраиваем клиент с прокси, если указан
-        client_kwargs = {'api_key': LLM_API_KEY}
+        # Проверяем, используется ли OpenRouter (ключ начинается с sk-or-v1-)
+        is_openrouter = LLM_API_KEY.startswith('sk-or-v1-') if LLM_API_KEY else False
+        
+        if is_openrouter:
+            # Используем OpenRouter API
+            base_url = "https://openrouter.ai/api/v1"
+            client_kwargs = {
+                'api_key': LLM_API_KEY,
+                'base_url': base_url,
+                'default_headers': {
+                    'HTTP-Referer': 'https://github.com/your-repo',  # Опционально, для отслеживания
+                    'X-Title': 'Questions Bot'  # Опционально, для идентификации
+                }
+            }
+        else:
+            # Используем стандартный OpenAI API
+            client_kwargs = {'api_key': LLM_API_KEY}
         
         # Определяем прокси: сначала из LLM_PROXY_URL, потом из системных переменных
         proxy_url = LLM_PROXY_URL
@@ -33,14 +49,16 @@ class LLMService:
             proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY') or os.getenv('https_proxy') or os.getenv('http_proxy')
         
         if proxy_url:
-            print(f"Используется прокси для OpenAI API: {proxy_url}")
+            api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
+            print(f"Используется прокси для {api_name}: {proxy_url}")
             # Создаем HTTP клиент с прокси
             client_kwargs['http_client'] = httpx.Client(
                 proxies=proxy_url,
                 timeout=30.0
             )
         else:
-            print("Прокси не настроен. Запросы идут напрямую к OpenAI API.")
+            api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
+            print(f"Прокси не настроен. Запросы идут напрямую к {api_name}.")
         
         self.client = openai.OpenAI(**client_kwargs)
     
