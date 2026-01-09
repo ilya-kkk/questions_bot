@@ -44,10 +44,11 @@ class Database:
         """Получает случайный вопрос, который еще не отмечен пользователем как выученный"""
         try:
             with self.get_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                # Используем обычный курсор для COUNT запросов
+                with conn.cursor() as count_cursor:
                     # Сначала проверяем, есть ли вообще вопросы в базе
-                    cursor.execute("SELECT COUNT(*) FROM questions")
-                    total_questions = cursor.fetchone()[0]
+                    count_cursor.execute("SELECT COUNT(*) FROM questions")
+                    total_questions = count_cursor.fetchone()[0]
                     print_flush(f"[DB] Всего вопросов в базе: {total_questions}")
                     
                     if total_questions == 0:
@@ -55,13 +56,15 @@ class Database:
                         return None
                     
                     # Проверяем, сколько вопросов выучено этим пользователем
-                    cursor.execute(
+                    count_cursor.execute(
                         "SELECT COUNT(*) FROM learned_questions WHERE user_id = %s",
                         (user_id,)
                     )
-                    learned_count = cursor.fetchone()[0]
+                    learned_count = count_cursor.fetchone()[0]
                     print_flush(f"[DB] Выучено вопросов пользователем {user_id}: {learned_count}")
-                    
+                
+                # Используем RealDictCursor для получения вопроса (чтобы вернуть словарь)
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     # Если пользователь не выучил ни одного вопроса, показываем любой случайный
                     if learned_count == 0:
                         print_flush(f"[DB] Пользователь не выучил ни одного вопроса, выбираем случайный из всех")
