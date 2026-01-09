@@ -46,11 +46,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         welcome_message = (
             "👋 Привет вкатун! Я бот чтобы ты наконецто заботал все вопросы и прошел собес на 300к наносек.\n\n"
         )
-        await update.message.reply_text(welcome_message, reply_markup=reply_markup)
+        try:
+            await update.message.reply_text(welcome_message, reply_markup=reply_markup)
+        except TelegramTimedOut as timeout_error:
+            print_flush(f"[HANDLER ERROR] Таймаут при отправке приветственного сообщения: {timeout_error}")
+            logger.error(f"Таймаут при отправке приветственного сообщения: {timeout_error}")
+        except Exception as send_error:
+            print_flush(f"[HANDLER ERROR] Ошибка при отправке приветственного сообщения: {send_error}")
+            logger.error(f"Ошибка при отправке приветственного сообщения: {send_error}")
     except Exception as e:
-        print_flush(f"Ошибка в start handler: {e}")
+        print_flush(f"[HANDLER ERROR] Ошибка в start handler: {e}")
+        logger.error(f"Ошибка в start handler: {e}")
         if update and update.message:
-            await update.message.reply_text("❌ Произошла ошибка при обработке команды", reply_markup=reply_markup)
+            try:
+                await update.message.reply_text("❌ Произошла ошибка при обработке команды", reply_markup=reply_markup)
+            except Exception as error_send_error:
+                print_flush(f"[HANDLER ERROR] Не удалось отправить сообщение об ошибке: {error_send_error}")
+                logger.error(f"Не удалось отправить сообщение об ошибке: {error_send_error}")
 
 async def random_question_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатия на inline кнопку 'Случайный вопрос'"""
@@ -96,10 +108,17 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         question = db.get_random_question()
         
         if not question:
-            await update.message.reply_text(
-                "❌ Не удалось получить вопрос из базы данных",
-                reply_markup=reply_markup
-            )
+            try:
+                await update.message.reply_text(
+                    "❌ Не удалось получить вопрос из базы данных",
+                    reply_markup=reply_markup
+                )
+            except TelegramTimedOut as timeout_error:
+                print_flush(f"[HANDLER ERROR] Таймаут при отправке сообщения об ошибке БД: {timeout_error}")
+                logger.error(f"Таймаут при отправке сообщения об ошибке БД: {timeout_error}")
+            except Exception as e:
+                print_flush(f"[HANDLER ERROR] Ошибка при отправке сообщения об ошибке БД: {e}")
+                logger.error(f"Ошибка при отправке сообщения об ошибке БД: {e}")
             return
         
         # Сохраняем вопрос в context для последующей обработки ответа
@@ -115,7 +134,31 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         message += f"<b>Вопрос:</b>\n{question['question']}\n\n"
         message += "💬 <b>Отправь свой ответ текстом, и я оценю его!</b>"
         
-        await update.message.reply_text(message, parse_mode='HTML', reply_markup=reply_markup)
+        try:
+            print_flush(f"[HANDLER] Отправляю вопрос #{question['id']} пользователю")
+            await update.message.reply_text(message, parse_mode='HTML', reply_markup=reply_markup)
+            print_flush(f"[HANDLER] Вопрос #{question['id']} успешно отправлен")
+        except TelegramTimedOut as timeout_error:
+            print_flush(f"[HANDLER ERROR] Таймаут при отправке вопроса пользователю: {timeout_error}")
+            logger.error(f"Таймаут при отправке вопроса пользователю: {timeout_error}")
+            # Пытаемся отправить упрощенное сообщение без форматирования
+            try:
+                simple_message = f"❓ Вопрос #{question['id']}\n\nТема: {question.get('topic', 'Не указана')}\n\nВопрос:\n{question['question']}\n\n💬 Отправь свой ответ текстом, и я оценю его!"
+                await update.message.reply_text(simple_message, reply_markup=reply_markup)
+                print_flush(f"[HANDLER] Упрощенный вопрос #{question['id']} отправлен после таймаута")
+            except Exception as retry_error:
+                print_flush(f"[HANDLER ERROR] Не удалось отправить даже упрощенный вопрос: {retry_error}")
+                logger.error(f"Не удалось отправить даже упрощенный вопрос: {retry_error}")
+        except Exception as e:
+            print_flush(f"[HANDLER ERROR] Ошибка при отправке вопроса пользователю: {e}")
+            logger.error(f"Ошибка при отправке вопроса пользователю: {e}")
+            # Пытаемся отправить упрощенное сообщение без форматирования
+            try:
+                simple_message = f"❓ Вопрос #{question['id']}\n\nТема: {question.get('topic', 'Не указана')}\n\nВопрос:\n{question['question']}\n\n💬 Отправь свой ответ текстом, и я оценю его!"
+                await update.message.reply_text(simple_message, reply_markup=reply_markup)
+            except Exception as retry_error:
+                print_flush(f"[HANDLER ERROR] Не удалось отправить даже упрощенный вопрос: {retry_error}")
+                logger.error(f"Не удалось отправить даже упрощенный вопрос: {retry_error}")
         return
     
     # Проверяем, есть ли активный вопрос в контексте (пользователь отвечает на вопрос)
@@ -332,10 +375,17 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     else:
         # Если пользователь отправил другой текст и нет активного вопроса, показываем подсказку
-        await update.message.reply_text(
-            "Используй кнопку '🎲 Случайный вопрос' для получения вопроса!",
-            reply_markup=reply_markup
-        )
+        try:
+            await update.message.reply_text(
+                "Используй кнопку '🎲 Случайный вопрос' для получения вопроса!",
+                reply_markup=reply_markup
+            )
+        except TelegramTimedOut as timeout_error:
+            print_flush(f"[HANDLER ERROR] Таймаут при отправке подсказки: {timeout_error}")
+            logger.error(f"Таймаут при отправке подсказки: {timeout_error}")
+        except Exception as e:
+            print_flush(f"[HANDLER ERROR] Ошибка при отправке подсказки: {e}")
+            logger.error(f"Ошибка при отправке подсказки: {e}")
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
@@ -350,7 +400,10 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"❌ Произошла ошибка: {str(context.error)}\n\nПопробуйте позже или используйте /help",
                 reply_markup=reply_markup
             )
-        except:
-            # Если не удалось отправить сообщение, просто логируем
-            pass
+        except TelegramTimedOut as timeout_error:
+            print_flush(f"[ERROR HANDLER] Таймаут при отправке сообщения об ошибке: {timeout_error}")
+            logger.error(f"Таймаут при отправке сообщения об ошибке: {timeout_error}")
+        except Exception as e:
+            print_flush(f"[ERROR HANDLER] Не удалось отправить сообщение об ошибке: {e}")
+            logger.error(f"Не удалось отправить сообщение об ошибке: {e}")
 
