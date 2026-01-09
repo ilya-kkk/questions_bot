@@ -55,30 +55,49 @@ class LLMService:
         
         # Создаем HTTP клиент с увеличенным таймаутом
         # Используем более длинный таймаут для надежности, особенно при использовании прокси
+        # Увеличиваем таймаут подключения, так как прокси может задерживать соединение
         http_timeout = httpx.Timeout(
-            connect=10.0,  # Таймаут подключения
+            connect=30.0,  # Таймаут подключения (увеличен для прокси)
             read=LLM_TIMEOUT,  # Таймаут чтения ответа
-            write=10.0,  # Таймаут записи
-            pool=10.0  # Таймаут получения соединения из пула
+            write=30.0,  # Таймаут записи (увеличен для прокси)
+            pool=30.0  # Таймаут получения соединения из пула (увеличен для прокси)
         )
         
         if proxy_url:
             api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
             print(f"Используется прокси для {api_name}: {proxy_url}")
             # Создаем HTTP клиент с прокси и увеличенным таймаутом
-            client_kwargs['http_client'] = httpx.Client(
+            http_client = httpx.Client(
                 proxies=proxy_url,
-                timeout=http_timeout
+                timeout=http_timeout,
+                follow_redirects=True  # Следовать редиректам
             )
+            client_kwargs['http_client'] = http_client
         else:
             api_name = "OpenRouter API" if is_openrouter else "OpenAI API"
             print(f"Прокси не настроен. Запросы идут напрямую к {api_name}.")
             # Создаем HTTP клиент без прокси, но с таймаутом
-            client_kwargs['http_client'] = httpx.Client(
-                timeout=http_timeout
+            http_client = httpx.Client(
+                timeout=http_timeout,
+                follow_redirects=True  # Следовать редиректам
             )
+            client_kwargs['http_client'] = http_client
+        
+        # Отключаем повторные попытки, чтобы избежать увеличения времени ожидания
+        # max_retries=0 означает, что при ошибке запрос не будет повторяться
+        client_kwargs['max_retries'] = 0
         
         self.client = openai.OpenAI(**client_kwargs)
+        
+        # Проверяем фактический таймаут HTTP клиента
+        if hasattr(self.client, '_client') and hasattr(self.client._client, '_client'):
+            actual_timeout = getattr(self.client._client._client, 'timeout', None)
+            if actual_timeout:
+                logger.info(f"Фактический таймаут HTTP клиента: {actual_timeout}")
+            else:
+                logger.warning("Не удалось определить фактический таймаут HTTP клиента")
+        
+        logger.info(f"OpenAI клиент инициализирован. Настроенный таймаут: connect=30.0s, read={LLM_TIMEOUT}s, write=30.0s, pool=30.0s")
     
     def evaluate_answer(self, question: str, user_answer: str, correct_answer: Optional[str] = None) -> str:
         """
@@ -105,7 +124,14 @@ class LLMService:
         user_prompt += f"Ответ пользователя: {user_answer}\n\n"
         user_prompt += "Дай оценку и короткий совет как улучшить мои знания и чего не хватает в моем ответе на вопрос."
         
+        # Логируем начало запроса
+        import time
+        start_time = time.time()
+        logger.info(f"Начало запроса к LLM API (таймаут: {LLM_TIMEOUT} сек)")
+        
         try:
+            # Таймаут контролируется через http_client, настроенный в __init__
+            # Не используем параметр timeout в create(), так как он может не поддерживаться
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -114,8 +140,10 @@ class LLMService:
                 ],
                 temperature=0.7,
                 max_tokens=200  # Ограничиваем длину ответа для короткого совета
-                # Таймаут контролируется через http_client в __init__
             )
+            
+            elapsed_time = time.time() - start_time
+            logger.info(f"Запрос к LLM API выполнен успешно за {elapsed_time:.2f} секунд")
             
             if not response.choices or not response.choices[0].message:
                 raise ValueError("Пустой ответ от OpenAI API")
@@ -125,20 +153,25 @@ class LLMService:
         except (httpx.TimeoutException, TimeoutError) as e:
             # Обработка ошибок таймаута
             import traceback
+            elapsed_time = time.time() - start_time
             error_details = traceback.format_exc()
             logger.error(
                 f"Таймаут при запросе к LLM API. "
+                f"Прошло времени: {elapsed_time:.2f} секунд, "
+                f"Таймаут: {LLM_TIMEOUT} секунд, "
                 f"Ошибка: {str(e)}, "
                 f"Тип ошибки: {type(e).__name__}\n"
                 f"Детали ошибки:\n{error_details}"
             )
             raise LLMTimeoutError(
                 f"Запрос к LLM API превысил таймаут ({LLM_TIMEOUT} секунд). "
+                f"Фактическое время ожидания: {elapsed_time:.2f} секунд. "
                 f"Возможные причины: медленное соединение, проблемы с прокси, перегрузка API. "
                 f"Попробуйте позже или проверьте настройки прокси."
             )
         except openai.APIError as e:
             # Обработка ошибки 403 - регион не поддерживается
+            elapsed_time = time.time() - start_time
             error_str = str(e)
             error_msg_lower = error_str.lower()
             
@@ -171,6 +204,7 @@ class LLMService:
             raise  # Пробрасываем другие ошибки API
         except Exception as e:
             # Обрабатываем другие типы ошибок (например, из response)
+            elapsed_time = time.time() - start_time
             error_str = str(e)
             if 'unsupported_country' in error_str.lower() or '403' in error_str:
                 import traceback
