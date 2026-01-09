@@ -59,6 +59,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_random_question(chat, user_id: int):
     """Отправляет случайный невыученный вопрос в указанный чат"""
+    total_count = db.get_total_questions_count()
+    if total_count == 0:
+        await chat.reply_text(
+            "❌ В базе данных нет вопросов.\n"
+            "Добавьте вопросы через импорт данных.",
+            reply_markup=reply_markup
+        )
+        return
+    
     question = db.get_random_question(user_id)
     if not question:
         await chat.reply_text(
@@ -80,11 +89,21 @@ async def random_question_callback(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
 
     user_id = query.from_user.id
+    total_count = db.get_total_questions_count()
+    
+    if total_count == 0:
+        await query.edit_message_text(
+            "❌ В базе данных нет вопросов.\n"
+            "Добавьте вопросы через импорт данных."
+        )
+        return
+    
     question = db.get_random_question(user_id)
 
     if not question:
         await query.edit_message_text(
-            "Все вопросы уже отмечены как выученные! 🎉"
+            "Все вопросы уже отмечены как выученные! 🎉\n"
+            "Можно сбросить отметки через БД, чтобы повторить заново."
         )
         return
 

@@ -45,24 +45,77 @@ class Database:
         try:
             with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    # Сначала проверяем, есть ли вообще вопросы в базе
+                    cursor.execute("SELECT COUNT(*) FROM questions")
+                    total_questions = cursor.fetchone()[0]
+                    print_flush(f"[DB] Всего вопросов в базе: {total_questions}")
+                    
+                    if total_questions == 0:
+                        print_flush(f"[DB] В базе нет вопросов!")
+                        return None
+                    
+                    # Проверяем, сколько вопросов выучено этим пользователем
                     cursor.execute(
-                        """
-                        SELECT q.id, q.question, q.topic, q.answer
-                        FROM questions q
-                        WHERE NOT EXISTS (
-                            SELECT 1 FROM learned_questions l
-                            WHERE l.question_id = q.id AND l.user_id = %s
-                        )
-                        ORDER BY RANDOM()
-                        LIMIT 1
-                        """,
+                        "SELECT COUNT(*) FROM learned_questions WHERE user_id = %s",
                         (user_id,)
                     )
+                    learned_count = cursor.fetchone()[0]
+                    print_flush(f"[DB] Выучено вопросов пользователем {user_id}: {learned_count}")
+                    
+                    # Если пользователь не выучил ни одного вопроса, показываем любой случайный
+                    if learned_count == 0:
+                        print_flush(f"[DB] Пользователь не выучил ни одного вопроса, выбираем случайный из всех")
+                        cursor.execute(
+                            """
+                            SELECT id, question, topic, answer
+                            FROM questions
+                            ORDER BY RANDOM()
+                            LIMIT 1
+                            """
+                        )
+                    else:
+                        # Если есть выученные вопросы, выбираем из невыученных
+                        print_flush(f"[DB] Выбираем из невыученных вопросов")
+                        cursor.execute(
+                            """
+                            SELECT q.id, q.question, q.topic, q.answer
+                            FROM questions q
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM learned_questions l
+                                WHERE l.question_id = q.id AND l.user_id = %s
+                            )
+                            ORDER BY RANDOM()
+                            LIMIT 1
+                            """,
+                            (user_id,)
+                        )
+                    
                     result = cursor.fetchone()
-                    return dict(result) if result else None
+                    
+                    if result:
+                        print_flush(f"[DB] Найден вопрос: id={result['id']}")
+                        return dict(result)
+                    else:
+                        # Если не нашли, значит все вопросы выучены
+                        print_flush(f"[DB] Не найдено невыученных вопросов для user_id={user_id} (все {total_questions} вопросов выучены)")
+                        return None
         except psycopg2.Error as e:
-            print_flush(f"Ошибка при получении случайного вопроса: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            print_flush(f"[DB ERROR] Ошибка при получении случайного вопроса: {e}")
+            print_flush(f"[DB ERROR] Детали: {error_details}")
             return None
+    
+    def get_total_questions_count(self) -> int:
+        """Возвращает общее количество вопросов в базе"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT COUNT(*) FROM questions")
+                    return cursor.fetchone()[0]
+        except psycopg2.Error as e:
+            print_flush(f"Ошибка при получении количества вопросов: {e}")
+            return 0
 
     def get_question_by_id(self, question_id: int) -> Optional[Dict]:
         """Возвращает вопрос по id"""
