@@ -1,6 +1,7 @@
 """
 Обработчики команд и сообщений для телеграм бота
 """
+import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.error import TimedOut as TelegramTimedOut
@@ -116,23 +117,33 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Оцениваем ответ через LLM
         if llm_service:
             try:
+                import time
+                start_time = time.time()
                 print(f"Оцениваю ответ пользователя на вопрос #{current_question['id']}")
-                evaluation = llm_service.evaluate_answer(
+                # Обертываем синхронный вызов в asyncio.to_thread, чтобы не блокировать event loop
+                # Это предотвращает таймауты при длительных запросах к LLM API
+                evaluation = await asyncio.to_thread(
+                    llm_service.evaluate_answer,
                     question=current_question['question'],
                     user_answer=user_answer,
                     correct_answer=current_question.get('answer')
                 )
                 
-                print(f"Получена оценка от LLM: {evaluation[:100]}...")
+                llm_time = time.time() - start_time
+                print(f"[HANDLER] Получена оценка от LLM за {llm_time:.2f} сек: {evaluation[:100]}...")
+                logger.info(f"LLM оценка получена за {llm_time:.2f} сек для вопроса #{current_question['id']}")
                 
                 # Формируем сообщение с оценкой
                 response_message = f"📝 <b>Оценка твоего ответа:</b>\n\n{evaluation}"
                 
                 # Редактируем сообщение "Оцениваю..." на результат
                 try:
+                    edit_start_time = time.time()
                     print(f"[HANDLER] Редактирую сообщение с результатом оценки (длина: {len(response_message)} символов)")
                     await processing_msg.edit_text(response_message, parse_mode='HTML', reply_markup=reply_markup)
-                    print(f"[HANDLER] Сообщение успешно отредактировано")
+                    edit_time = time.time() - edit_start_time
+                    print(f"[HANDLER] Сообщение успешно отредактировано за {edit_time:.2f} сек")
+                    logger.info(f"Сообщение отредактировано за {edit_time:.2f} сек")
                 except TelegramTimedOut as timeout_error:
                     # Специальная обработка таймаута Telegram API
                     print(f"[HANDLER ERROR] Таймаут при редактировании сообщения в Telegram: {timeout_error}")
