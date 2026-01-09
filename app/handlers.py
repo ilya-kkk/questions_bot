@@ -166,6 +166,11 @@ async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 pass
             return
 
+        # Логируем показ ответа
+        user = query.from_user
+        username = user.username or user.first_name or f"user_{user.id}"
+        db.log_user_action(username, question_id)
+
         message = _question_text(question, with_answer=True)
         keyboard = [
             [
@@ -230,6 +235,10 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
         inserted = db.mark_question_learned(user.id, user.username, question_id)
         status_text = "✅ Вопрос отмечен как выученный" if inserted else "✅ Уже был отмечен как выученный"
 
+        # Логируем действие (если еще не было залогировано при показе ответа)
+        username = user.username or user.first_name or f"user_{user.id}"
+        db.log_user_action(username, question_id)
+
         # Формируем сообщение с вопросом, ответом и статусом
         message = _question_text(question, with_answer=True)
         message += f"\n\n{status_text}"
@@ -286,6 +295,11 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
             return
+
+        # Логируем действие (если еще не было залогировано при показе ответа)
+        user = query.from_user
+        username = user.username or user.first_name or f"user_{user.id}"
+        db.log_user_action(username, question_id)
 
         # Формируем сообщение с вопросом, ответом и статусом
         message = _question_text(question, with_answer=True)

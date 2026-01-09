@@ -156,3 +156,20 @@ class Database:
             print_flush(f"Ошибка при отметке вопроса как выученного: {e}")
             return False
 
+    def log_user_action(self, username: str, question_id: int):
+        """Логирует действие пользователя с вопросом в таблицу user_logs"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO user_logs (username, question_id)
+                        VALUES (%s, %s)
+                        """,
+                        (username, question_id)
+                    )
+                    conn.commit()
+                    print_flush(f"[DB] Записан лог: username={username}, question_id={question_id}")
+        except psycopg2.Error as e:
+            print_flush(f"Ошибка при записи лога: {e}")
+
