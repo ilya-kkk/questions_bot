@@ -13,10 +13,12 @@ from telegram.ext import (
     ContextTypes
 )
 from app.config import BOT_TOKEN
-from app.database import Database
 from app.handlers import (
     start,
     random_question_callback,
+    show_answer_callback,
+    mark_learned_callback,
+    repeat_callback,
     handle_text_message,
     error_handler
 )
@@ -33,7 +35,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Настраиваем все логгеры на вывод в stdout
-for logger_name in ['app', 'app.bot', 'app.handlers', 'app.llm_service', 'app.database']:
+for logger_name in ['app', 'app.bot', 'app.handlers', 'app.database']:
     log = logging.getLogger(logger_name)
     log.setLevel(logging.INFO)
     log.handlers = []  # Очищаем существующие обработчики
@@ -60,14 +62,6 @@ def main():
         logger.error(f"ОШИБКА: database совпадает с user! database={DB_CONFIG.get('database')}, user={DB_CONFIG.get('user')}")
         return
     
-    # Создаем таблицу user_logs если её нет
-    db = Database()
-    try:
-        db.create_logs_table()
-        logger.info("Таблица user_logs проверена/создана")
-    except Exception as e:
-        logger.warning(f"Не удалось создать таблицу user_logs: {e}")
-    
     # Создаем приложение с увеличенным таймаутом для Telegram API
     # Увеличиваем таймаут, так как при использовании прокси запросы могут занимать больше времени
     from telegram.request import HTTPXRequest
@@ -89,10 +83,11 @@ def main():
     # Регистрируем обработчик текстовых сообщений (для Reply Keyboard)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     
-    # Регистрируем обработчик callback кнопок (для Inline Keyboard)
-    application.add_handler(
-        CallbackQueryHandler(random_question_callback, pattern="^random_question$")
-    )
+    # Callback кнопки
+    application.add_handler(CallbackQueryHandler(random_question_callback, pattern="^random_question$"))
+    application.add_handler(CallbackQueryHandler(show_answer_callback, pattern="^show_answer:\\d+$"))
+    application.add_handler(CallbackQueryHandler(mark_learned_callback, pattern="^learned:\\d+$"))
+    application.add_handler(CallbackQueryHandler(repeat_callback, pattern="^repeat:\\d+$"))
     
     # Регистрируем обработчик ошибок
     application.add_error_handler(error_handler)

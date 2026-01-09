@@ -16,16 +16,6 @@ load_dotenv()
 # Токен бота (получить у @BotFather)
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
-# API ключ для OpenAI/OpenRouter (для оценки ответов)
-# OpenRouter ключи начинаются с sk-or-v1-, OpenAI ключи начинаются с sk-
-LLM_API_KEY = os.getenv('LLM_API_KEY')
-
-# Прокси для OpenAI API (опционально)
-# Если VLESS клиент работает на сервере, используйте локальный HTTP прокси
-# Обычно v2ray/xray создает HTTP прокси на localhost:10808 или другом порту
-# Если VLESS работает на уровне системы, оставьте пустым и используйте системные переменные HTTP_PROXY/HTTPS_PROXY
-LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', '')
-
 # Параметры подключения к БД
 # ВАЖНО: Используем POSTGRES_DB для имени базы данных, а не POSTGRES_USER!
 postgres_db = os.getenv('POSTGRES_DB')
@@ -80,7 +70,4 @@ BOT_SETTINGS = {
     'max_questions_per_user': 10,  # Максимальное количество вопросов на пользователя
     'timeout': 30  # Таймаут ожидания ответа в секундах
 }
-
-# Настройки LLM API
-LLM_TIMEOUT = int(os.getenv('LLM_TIMEOUT', '90'))  # Таймаут для запросов к LLM API в секундах (по умолчанию 90)
 

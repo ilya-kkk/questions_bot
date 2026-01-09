@@ -20,6 +20,8 @@ psql -h localhost -U app_user -d app_db -f migrations/001_initial_schema.sql
 
 Миграции должны применяться в порядке их номеров:
 - 001_initial_schema.sql - начальная схема БД
+- 002_add_user_answer_column.sql - (устаревшая) колонка user_answer в логах
+- 003_learned_questions.sql - таблица learned_questions и удаление user_answer
 
 ## Создание новой миграции
 
