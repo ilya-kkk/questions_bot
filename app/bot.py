@@ -55,8 +55,20 @@ def main():
     except Exception as e:
         logger.warning(f"Не удалось создать таблицу user_logs: {e}")
     
-    # Создаем приложение
-    application = Application.builder().token(BOT_TOKEN).build()
+    # Создаем приложение с увеличенным таймаутом для Telegram API
+    # Увеличиваем таймаут, так как при использовании прокси запросы могут занимать больше времени
+    from telegram.request import HTTPXRequest
+    
+    request = HTTPXRequest(
+        connection_pool_size=8,
+        read_timeout=60.0,  # Таймаут чтения ответа (увеличен для прокси)
+        write_timeout=60.0,  # Таймаут записи запроса (увеличен для прокси)
+        connect_timeout=30.0,  # Таймаут подключения (увеличен для прокси)
+        pool_timeout=30.0  # Таймаут получения соединения из пула
+    )
+    
+    application = Application.builder().token(BOT_TOKEN).request(request).build()
+    logger.info("Telegram бот настроен с увеличенными таймаутами: read=60s, write=60s, connect=30s, pool=30s")
     
     # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start))

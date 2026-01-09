@@ -186,6 +186,10 @@ class Database:
                         print(f"Не удалось добавить колонку user_answer: {e}")
                         conn.rollback()
                 
+                # Логируем что собираемся сохранить
+                user_answer_preview = user_answer[:50] + "..." if user_answer and len(user_answer) > 50 else (user_answer or "None")
+                print(f"[DB] Сохранение лога: table={table_name}, username={username}, question_id={question_id}, has_column={has_user_answer_column}, user_answer_len={len(user_answer) if user_answer else 0}")
+                
                 # Вставляем данные с учетом наличия колонки user_answer
                 if timestamp:
                     if has_user_answer_column:
@@ -196,6 +200,7 @@ class Database:
                             """,
                             (timestamp, username, question_id, user_answer)
                         )
+                        print(f"[DB] INSERT с timestamp и user_answer: {user_answer_preview}")
                     else:
                         cursor.execute(
                             f"""
@@ -204,6 +209,7 @@ class Database:
                             """,
                             (timestamp, username, question_id)
                         )
+                        print(f"[DB] INSERT с timestamp БЕЗ user_answer (колонка отсутствует)")
                 else:
                     if has_user_answer_column:
                         cursor.execute(
@@ -213,6 +219,7 @@ class Database:
                             """,
                             (username, question_id, user_answer)
                         )
+                        print(f"[DB] INSERT БЕЗ timestamp с user_answer: {user_answer_preview}")
                     else:
                         cursor.execute(
                             f"""
@@ -221,9 +228,11 @@ class Database:
                             """,
                             (username, question_id)
                         )
+                        print(f"[DB] INSERT БЕЗ timestamp БЕЗ user_answer (колонка отсутствует)")
+                
                 conn.commit()
                 cursor.close()
-                print(f"Лог успешно записан: username={username}, question_id={question_id}, user_answer={'сохранен' if user_answer else 'не указан'}")
+                print(f"[DB] Лог успешно записан: username={username}, question_id={question_id}, user_answer={'сохранен (' + str(len(user_answer)) + ' символов)' if user_answer else 'не указан'}")
             except Exception as e:
                 conn.rollback()
                 raise

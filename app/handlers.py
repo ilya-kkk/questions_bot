@@ -3,6 +3,7 @@
 """
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.error import TimedOut as TelegramTimedOut
 from telegram.ext import ContextTypes
 from app.database import Database
 from app.llm_service import LLMService, UnsupportedRegionError, LLMTimeoutError
@@ -124,15 +125,46 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 
                 print(f"Получена оценка от LLM: {evaluation[:100]}...")
                 
-                # Удаляем сообщение "Оцениваю..." и отправляем новое с результатом
-                try:
-                    await processing_msg.delete()
-                except:
-                    pass  # Игнорируем ошибку удаления, если сообщение уже удалено
-                
                 # Формируем сообщение с оценкой
                 response_message = f"📝 <b>Оценка твоего ответа:</b>\n\n{evaluation}"
-                await update.message.reply_text(response_message, parse_mode='HTML', reply_markup=reply_markup)
+                
+                # Редактируем сообщение "Оцениваю..." на результат
+                try:
+                    print(f"[HANDLER] Редактирую сообщение с результатом оценки (длина: {len(response_message)} символов)")
+                    await processing_msg.edit_text(response_message, parse_mode='HTML', reply_markup=reply_markup)
+                    print(f"[HANDLER] Сообщение успешно отредактировано")
+                except TelegramTimedOut as timeout_error:
+                    # Специальная обработка таймаута Telegram API
+                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения в Telegram: {timeout_error}")
+                    logger.error(f"Таймаут при редактировании сообщения в Telegram: {timeout_error}")
+                    
+                    # Пытаемся отредактировать упрощенное сообщение без форматирования
+                    try:
+                        simple_message = f"📝 Оценка твоего ответа:\n\n{evaluation[:1000]}"  # Ограничиваем длину
+                        print(f"[HANDLER] Пытаюсь отредактировать упрощенное сообщение (длина: {len(simple_message)} символов)")
+                        await processing_msg.edit_text(simple_message, reply_markup=reply_markup)
+                        print("[HANDLER] Упрощенное сообщение отредактировано успешно после таймаута")
+                    except Exception as retry_error:
+                        print(f"[HANDLER ERROR] Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
+                        logger.error(f"Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
+                        # В крайнем случае просто логируем ошибку, но не прерываем выполнение
+                except Exception as edit_error:
+                    # Обработка других ошибок при редактировании сообщения
+                    error_str = str(edit_error)
+                    error_type = type(edit_error).__name__
+                    print(f"[HANDLER ERROR] Ошибка при редактировании сообщения в Telegram: {error_type}: {error_str}")
+                    logger.error(f"Ошибка при редактировании сообщения в Telegram: {error_type}: {error_str}")
+                    
+                    # Пытаемся отредактировать упрощенное сообщение без форматирования
+                    try:
+                        simple_message = f"📝 Оценка твоего ответа:\n\n{evaluation[:1000]}"  # Ограничиваем длину
+                        print(f"[HANDLER] Пытаюсь отредактировать упрощенное сообщение после ошибки")
+                        await processing_msg.edit_text(simple_message, reply_markup=reply_markup)
+                        print("[HANDLER] Упрощенное сообщение отредактировано успешно после ошибки")
+                    except Exception as retry_error:
+                        print(f"[HANDLER ERROR] Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
+                        logger.error(f"Не удалось отредактировать даже упрощенное сообщение: {retry_error}")
+                        # В крайнем случае просто логируем ошибку, но не прерываем выполнение
                 
             except UnsupportedRegionError as e:
                 # Специальная обработка ошибки недоступности API в регионе
@@ -149,20 +181,24 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     f"Детали ошибки:\n{error_details}"
                 )
                 
-                try:
-                    await processing_msg.delete()
-                except:
-                    pass
-                
-                await update.message.reply_text(
+                # Редактируем сообщение "Оцениваю..." на сообщение об ошибке
+                error_message = (
                     "❌ <b>OpenAI API недоступен в вашем регионе</b>\n\n"
                     "Для работы функции оценки ответов необходимо:\n"
                     "• Использовать VPN\n"
                     "• Или настроить альтернативный LLM API (Yandex GPT, Anthropic Claude и т.д.)\n\n"
-                    "Ваш ответ был сохранен в логах.",
-                    parse_mode='HTML',
-                    reply_markup=reply_markup
+                    "Ваш ответ был сохранен в логах."
                 )
+                try:
+                    print(f"[HANDLER] Редактирую сообщение об ошибке региона")
+                    await processing_msg.edit_text(error_message, parse_mode='HTML', reply_markup=reply_markup)
+                    print(f"[HANDLER] Сообщение об ошибке региона успешно отредактировано")
+                except TelegramTimedOut as timeout_error:
+                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения об ошибке региона: {timeout_error}")
+                    logger.error(f"Таймаут при редактировании сообщения об ошибке региона: {timeout_error}")
+                except Exception as edit_error:
+                    print(f"[HANDLER ERROR] Не удалось отредактировать сообщение об ошибке региона: {edit_error}")
+                    logger.error(f"Не удалось отредактировать сообщение об ошибке региона: {edit_error}")
             except LLMTimeoutError as e:
                 # Специальная обработка ошибки таймаута
                 import traceback
@@ -186,22 +222,26 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     f"Детали ошибки:\n{error_details}"
                 )
                 
-                try:
-                    await processing_msg.delete()
-                except:
-                    pass
-                
-                await update.message.reply_text(
+                # Редактируем сообщение "Оцениваю..." на сообщение о таймауте
+                timeout_message = (
                     "⏱️ <b>Превышено время ожидания ответа от LLM API</b>\n\n"
                     "Возможные причины:\n"
                     "• Медленное соединение\n"
                     "• Проблемы с прокси\n"
                     "• Перегрузка API сервера\n\n"
                     "Попробуйте позже или проверьте настройки прокси.\n\n"
-                    "Ваш ответ был сохранен в логах.",
-                    parse_mode='HTML',
-                    reply_markup=reply_markup
+                    "Ваш ответ был сохранен в логах."
                 )
+                try:
+                    print(f"[HANDLER] Редактирую сообщение о таймауте LLM")
+                    await processing_msg.edit_text(timeout_message, parse_mode='HTML', reply_markup=reply_markup)
+                    print(f"[HANDLER] Сообщение о таймауте LLM успешно отредактировано")
+                except TelegramTimedOut as timeout_error:
+                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения о таймауте LLM: {timeout_error}")
+                    logger.error(f"Таймаут при редактировании сообщения о таймауте LLM: {timeout_error}")
+                except Exception as edit_error:
+                    print(f"[HANDLER ERROR] Не удалось отредактировать сообщение о таймауте: {edit_error}")
+                    logger.error(f"Не удалось отредактировать сообщение о таймауте: {edit_error}")
             except Exception as e:
                 import traceback
                 error_details = traceback.format_exc()
@@ -212,50 +252,58 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 if len(error_msg) > 200:
                     error_msg = error_msg[:200] + "..."
                 
-                # Удаляем сообщение "Оцениваю..." и отправляем новое с ошибкой
+                # Редактируем сообщение "Оцениваю..." на сообщение об ошибке
+                error_message = f"❌ Ошибка при оценке ответа: {error_msg}"
                 try:
-                    await processing_msg.delete()
-                except:
-                    pass
-                
-                await update.message.reply_text(
-                    f"❌ Ошибка при оценке ответа: {error_msg}",
-                    parse_mode='HTML',
-                    reply_markup=reply_markup
-                )
+                    print(f"[HANDLER] Редактирую сообщение об общей ошибке")
+                    await processing_msg.edit_text(error_message, parse_mode='HTML', reply_markup=reply_markup)
+                    print(f"[HANDLER] Сообщение об общей ошибке успешно отредактировано")
+                except TelegramTimedOut as timeout_error:
+                    print(f"[HANDLER ERROR] Таймаут при редактировании сообщения об общей ошибке: {timeout_error}")
+                    logger.error(f"Таймаут при редактировании сообщения об общей ошибке: {timeout_error}")
+                except Exception as edit_error:
+                    print(f"[HANDLER ERROR] Не удалось отредактировать сообщение об ошибке: {edit_error}")
+                    logger.error(f"Не удалось отредактировать сообщение об ошибке: {edit_error}")
         else:
-            # Удаляем сообщение "Оцениваю..." и отправляем новое
+            # Редактируем сообщение "Оцениваю..." на сообщение об отсутствии API ключа
+            no_key_message = "❌ Оценка ответов недоступна: LLM_API_KEY не установлен"
             try:
-                await processing_msg.delete()
-            except:
-                pass
-            
-            await update.message.reply_text(
-                "❌ Оценка ответов недоступна: LLM_API_KEY не установлен",
-                parse_mode='HTML',
-                reply_markup=reply_markup
-            )
+                print(f"[HANDLER] Редактирую сообщение об отсутствии API ключа")
+                await processing_msg.edit_text(no_key_message, parse_mode='HTML', reply_markup=reply_markup)
+                print(f"[HANDLER] Сообщение об отсутствии API ключа успешно отредактировано")
+            except TelegramTimedOut as timeout_error:
+                print(f"[HANDLER ERROR] Таймаут при редактировании сообщения об отсутствии API ключа: {timeout_error}")
+                logger.error(f"Таймаут при редактировании сообщения об отсутствии API ключа: {timeout_error}")
+            except Exception as edit_error:
+                print(f"[HANDLER ERROR] Не удалось отредактировать сообщение об отсутствии API ключа: {edit_error}")
+                logger.error(f"Не удалось отредактировать сообщение об отсутствии API ключа: {edit_error}")
         
         # Получаем username пользователя
         username = update.message.from_user.username or update.message.from_user.first_name or "unknown"
         
         # Сохраняем лог в БД (всегда, независимо от результата оценки)
+        # Делаем это в блоке finally, чтобы гарантировать сохранение даже при ошибках
         try:
-            print(f"Попытка записи лога: username={username}, question_id={current_question['id']}, user_answer={user_answer[:50] if user_answer else 'None'}...")
+            user_answer_preview = user_answer[:50] + "..." if user_answer and len(user_answer) > 50 else (user_answer or "None")
+            print(f"[HANDLER] Попытка записи лога: username={username}, question_id={current_question['id']}, user_answer_len={len(user_answer) if user_answer else 0}, user_answer_preview={user_answer_preview}")
+            print(f"[HANDLER] user_answer type: {type(user_answer)}, value: {repr(user_answer)}")
+            
             db.log_question_answer(
                 username=username,
                 question_id=current_question['id'],
-                user_answer=user_answer
+                user_answer=user_answer  # Передаем ответ пользователя
             )
-            print(f"Лог успешно записан в БД")
+            print(f"[HANDLER] Лог успешно записан в БД")
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
+            print(f"[HANDLER ERROR] КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
+            logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при записи лога: {error_details}")
             # Не прерываем выполнение, но логируем детально
-        
-        # Очищаем текущий вопрос из контекста
-        del context.user_data['current_question']
+        finally:
+            # Очищаем текущий вопрос из контекста в любом случае
+            if 'current_question' in context.user_data:
+                del context.user_data['current_question']
         
         return
     else:
