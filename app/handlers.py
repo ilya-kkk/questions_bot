@@ -192,11 +192,22 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_text("❌ Некорректный запрос")
             return
 
+        # Получаем вопрос из БД, чтобы сохранить текст
+        question = db.get_question_by_id(question_id)
+        if not question:
+            await query.edit_message_text("❌ Вопрос не найден в базе")
+            return
+
         user = query.from_user
         inserted = db.mark_question_learned(user.id, user.username, question_id)
         status_text = "✅ Вопрос отмечен как выученный" if inserted else "✅ Уже был отмечен как выученный"
 
-        await query.edit_message_text(f"{status_text}\n\nИспользуй кнопку '🎲 Случайный вопрос', чтобы получить новый вопрос.")
+        # Формируем сообщение с вопросом, ответом и статусом
+        message = _question_text(question, with_answer=True)
+        message += f"\n\n{status_text}"
+
+        # Обновляем сообщение без кнопок
+        await query.edit_message_text(message, parse_mode='HTML')
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
@@ -220,7 +231,26 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.answer()
 
-        await query.edit_message_text("Ок, повторим позже. Используй кнопку '🎲 Случайный вопрос', чтобы взять другой вопрос.")
+        try:
+            _, question_id_str = query.data.split(":", 1)
+            question_id = int(question_id_str)
+        except Exception as e:
+            print_flush(f"[HANDLER ERROR] Ошибка парсинга question_id: {e}, data={query.data}")
+            await query.edit_message_text("❌ Некорректный запрос")
+            return
+
+        # Получаем вопрос из БД, чтобы сохранить текст
+        question = db.get_question_by_id(question_id)
+        if not question:
+            await query.edit_message_text("❌ Вопрос не найден в базе")
+            return
+
+        # Формируем сообщение с вопросом, ответом и статусом
+        message = _question_text(question, with_answer=True)
+        message += "\n\n🔁 Вопрос продолжит попадаться в случайной выдаче"
+
+        # Обновляем сообщение без кнопок
+        await query.edit_message_text(message, parse_mode='HTML')
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
