@@ -292,14 +292,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Редактируем сообщение "Оцениваю..." на сообщение об отсутствии API ключа
             no_key_message = "❌ Оценка ответов недоступна: LLM_API_KEY не установлен"
             try:
-                    print_flush(f"[HANDLER] Редактирую сообщение об отсутствии API ключа")
+                print_flush(f"[HANDLER] Редактирую сообщение об отсутствии API ключа")
                 await processing_msg.edit_text(no_key_message, parse_mode='HTML', reply_markup=reply_markup)
-                print(f"[HANDLER] Сообщение об отсутствии API ключа успешно отредактировано")
+                print_flush(f"[HANDLER] Сообщение об отсутствии API ключа успешно отредактировано")
             except TelegramTimedOut as timeout_error:
-                print(f"[HANDLER ERROR] Таймаут при редактировании сообщения об отсутствии API ключа: {timeout_error}")
+                print_flush(f"[HANDLER ERROR] Таймаут при редактировании сообщения об отсутствии API ключа: {timeout_error}")
                 logger.error(f"Таймаут при редактировании сообщения об отсутствии API ключа: {timeout_error}")
             except Exception as edit_error:
-                print(f"[HANDLER ERROR] Не удалось отредактировать сообщение об отсутствии API ключа: {edit_error}")
+                print_flush(f"[HANDLER ERROR] Не удалось отредактировать сообщение об отсутствии API ключа: {edit_error}")
                 logger.error(f"Не удалось отредактировать сообщение об отсутствии API ключа: {edit_error}")
         
         # Получаем username пользователя
