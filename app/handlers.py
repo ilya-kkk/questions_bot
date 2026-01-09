@@ -4,7 +4,7 @@
 import logging
 import sys
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from telegram.error import TimedOut as TelegramTimedOut
+from telegram.error import TimedOut as TelegramTimedOut, BadRequest
 from telegram.ext import ContextTypes
 from app.database import Database
 
@@ -137,19 +137,33 @@ async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             print_flush("[HANDLER ERROR] query is None in show_answer_callback")
             return
         
-        await query.answer()
+        # Пытаемся ответить на callback, но игнорируем ошибку если query устарел
+        try:
+            await query.answer()
+        except BadRequest as e:
+            if "too old" in str(e).lower() or "timeout" in str(e).lower() or "invalid" in str(e).lower():
+                # Query устарел - это не критично, просто продолжаем
+                print_flush(f"[HANDLER] Callback query устарел, продолжаем обработку")
+            else:
+                raise
 
         try:
             _, question_id_str = query.data.split(":", 1)
             question_id = int(question_id_str)
         except Exception as e:
             print_flush(f"[HANDLER ERROR] Ошибка парсинга question_id: {e}, data={query.data}")
-            await query.edit_message_text("❌ Некорректный запрос")
+            try:
+                await query.edit_message_text("❌ Некорректный запрос")
+            except:
+                pass
             return
 
         question = db.get_question_by_id(question_id)
         if not question:
-            await query.edit_message_text("❌ Вопрос не найден в базе")
+            try:
+                await query.edit_message_text("❌ Вопрос не найден в базе")
+            except:
+                pass
             return
 
         message = _question_text(question, with_answer=True)
@@ -161,17 +175,18 @@ async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
         inline_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(message, parse_mode='HTML', reply_markup=inline_markup)
+    except BadRequest as e:
+        # Игнорируем ошибки устаревших queries при редактировании
+        if "too old" in str(e).lower() or "timeout" in str(e).lower() or "invalid" in str(e).lower():
+            print_flush(f"[HANDLER] Callback query устарел при редактировании, игнорируем")
+        else:
+            raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
         print_flush(f"[HANDLER ERROR] Ошибка в show_answer_callback: {e}")
         print_flush(f"[HANDLER ERROR] Детали: {error_details}")
         logger.error(f"Ошибка в show_answer_callback: {e}\n{error_details}")
-        if update.callback_query:
-            try:
-                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
-            except:
-                pass
 
 
 async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -182,20 +197,33 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
             print_flush("[HANDLER ERROR] query is None in mark_learned_callback")
             return
         
-        await query.answer()
+        # Пытаемся ответить на callback, но игнорируем ошибку если query устарел
+        try:
+            await query.answer()
+        except BadRequest as e:
+            if "too old" in str(e).lower() or "timeout" in str(e).lower() or "invalid" in str(e).lower():
+                print_flush(f"[HANDLER] Callback query устарел, продолжаем обработку")
+            else:
+                raise
 
         try:
             _, question_id_str = query.data.split(":", 1)
             question_id = int(question_id_str)
         except Exception as e:
             print_flush(f"[HANDLER ERROR] Ошибка парсинга question_id: {e}, data={query.data}")
-            await query.edit_message_text("❌ Некорректный запрос")
+            try:
+                await query.edit_message_text("❌ Некорректный запрос")
+            except:
+                pass
             return
 
         # Получаем вопрос из БД, чтобы сохранить текст
         question = db.get_question_by_id(question_id)
         if not question:
-            await query.edit_message_text("❌ Вопрос не найден в базе")
+            try:
+                await query.edit_message_text("❌ Вопрос не найден в базе")
+            except:
+                pass
             return
 
         user = query.from_user
@@ -208,17 +236,18 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
         # Обновляем сообщение без кнопок
         await query.edit_message_text(message, parse_mode='HTML')
+    except BadRequest as e:
+        # Игнорируем ошибки устаревших queries при редактировании
+        if "too old" in str(e).lower() or "timeout" in str(e).lower() or "invalid" in str(e).lower():
+            print_flush(f"[HANDLER] Callback query устарел при редактировании, игнорируем")
+        else:
+            raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
         print_flush(f"[HANDLER ERROR] Ошибка в mark_learned_callback: {e}")
         print_flush(f"[HANDLER ERROR] Детали: {error_details}")
         logger.error(f"Ошибка в mark_learned_callback: {e}\n{error_details}")
-        if update.callback_query:
-            try:
-                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
-            except:
-                pass
 
 
 async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,20 +258,33 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print_flush("[HANDLER ERROR] query is None in repeat_callback")
             return
         
-        await query.answer()
+        # Пытаемся ответить на callback, но игнорируем ошибку если query устарел
+        try:
+            await query.answer()
+        except BadRequest as e:
+            if "too old" in str(e).lower() or "timeout" in str(e).lower() or "invalid" in str(e).lower():
+                print_flush(f"[HANDLER] Callback query устарел, продолжаем обработку")
+            else:
+                raise
 
         try:
             _, question_id_str = query.data.split(":", 1)
             question_id = int(question_id_str)
         except Exception as e:
             print_flush(f"[HANDLER ERROR] Ошибка парсинга question_id: {e}, data={query.data}")
-            await query.edit_message_text("❌ Некорректный запрос")
+            try:
+                await query.edit_message_text("❌ Некорректный запрос")
+            except:
+                pass
             return
 
         # Получаем вопрос из БД, чтобы сохранить текст
         question = db.get_question_by_id(question_id)
         if not question:
-            await query.edit_message_text("❌ Вопрос не найден в базе")
+            try:
+                await query.edit_message_text("❌ Вопрос не найден в базе")
+            except:
+                pass
             return
 
         # Формируем сообщение с вопросом, ответом и статусом
@@ -251,17 +293,18 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Обновляем сообщение без кнопок
         await query.edit_message_text(message, parse_mode='HTML')
+    except BadRequest as e:
+        # Игнорируем ошибки устаревших queries при редактировании
+        if "too old" in str(e).lower() or "timeout" in str(e).lower() or "invalid" in str(e).lower():
+            print_flush(f"[HANDLER] Callback query устарел при редактировании, игнорируем")
+        else:
+            raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
         print_flush(f"[HANDLER ERROR] Ошибка в repeat_callback: {e}")
         print_flush(f"[HANDLER ERROR] Детали: {error_details}")
         logger.error(f"Ошибка в repeat_callback: {e}\n{error_details}")
-        if update.callback_query:
-            try:
-                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
-            except:
-                pass
 
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
