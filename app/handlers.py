@@ -85,92 +85,158 @@ async def send_random_question(chat, user_id: int):
 
 async def random_question_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатия inline 'Случайный вопрос'"""
-    query = update.callback_query
-    await query.answer()
+    try:
+        query = update.callback_query
+        if not query:
+            print_flush("[HANDLER ERROR] query is None in random_question_callback")
+            return
+        
+        await query.answer()
 
-    user_id = query.from_user.id
-    total_count = db.get_total_questions_count()
-    
-    if total_count == 0:
-        await query.edit_message_text(
-            "❌ В базе данных нет вопросов.\n"
-            "Добавьте вопросы через импорт данных."
-        )
-        return
-    
-    question = db.get_random_question(user_id)
+        user_id = query.from_user.id
+        total_count = db.get_total_questions_count()
+        
+        if total_count == 0:
+            await query.edit_message_text(
+                "❌ В базе данных нет вопросов.\n"
+                "Добавьте вопросы через импорт данных."
+            )
+            return
+        
+        question = db.get_random_question(user_id)
 
-    if not question:
-        await query.edit_message_text(
-            "Все вопросы уже отмечены как выученные! 🎉\n"
-            "Можно сбросить отметки через БД, чтобы повторить заново."
-        )
-        return
+        if not question:
+            await query.edit_message_text(
+                "Все вопросы уже отмечены как выученные! 🎉\n"
+                "Можно сбросить отметки через БД, чтобы повторить заново."
+            )
+            return
 
-    message = _question_text(question)
-    keyboard = [[InlineKeyboardButton("👁 Показать ответ", callback_data=f"show_answer:{question['id']}")]]
-    inline_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(message, parse_mode='HTML', reply_markup=inline_markup)
+        message = _question_text(question)
+        keyboard = [[InlineKeyboardButton("👁 Показать ответ", callback_data=f"show_answer:{question['id']}")]]
+        inline_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(message, parse_mode='HTML', reply_markup=inline_markup)
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print_flush(f"[HANDLER ERROR] Ошибка в random_question_callback: {e}")
+        print_flush(f"[HANDLER ERROR] Детали: {error_details}")
+        logger.error(f"Ошибка в random_question_callback: {e}\n{error_details}")
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
+            except:
+                pass
 
 
 async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает ответ и предлагает отметить выученным/повторить"""
-    query = update.callback_query
-    await query.answer()
-
     try:
-        _, question_id_str = query.data.split(":", 1)
-        question_id = int(question_id_str)
-    except Exception:
-        await query.edit_message_text("❌ Некорректный запрос")
-        return
+        query = update.callback_query
+        if not query:
+            print_flush("[HANDLER ERROR] query is None in show_answer_callback")
+            return
+        
+        await query.answer()
 
-    question = db.get_question_by_id(question_id)
-    if not question:
-        await query.edit_message_text("❌ Вопрос не найден в базе")
-        return
+        try:
+            _, question_id_str = query.data.split(":", 1)
+            question_id = int(question_id_str)
+        except Exception as e:
+            print_flush(f"[HANDLER ERROR] Ошибка парсинга question_id: {e}, data={query.data}")
+            await query.edit_message_text("❌ Некорректный запрос")
+            return
 
-    message = _question_text(question, with_answer=True)
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Запомнил", callback_data=f"learned:{question_id}"),
-            InlineKeyboardButton("🔁 Повторю", callback_data=f"repeat:{question_id}")
-        ],
-        [InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]
-    ]
-    inline_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(message, parse_mode='HTML', reply_markup=inline_markup)
+        question = db.get_question_by_id(question_id)
+        if not question:
+            await query.edit_message_text("❌ Вопрос не найден в базе")
+            return
+
+        message = _question_text(question, with_answer=True)
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Запомнил", callback_data=f"learned:{question_id}"),
+                InlineKeyboardButton("🔁 Повторю", callback_data=f"repeat:{question_id}")
+            ],
+            [InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]
+        ]
+        inline_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(message, parse_mode='HTML', reply_markup=inline_markup)
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print_flush(f"[HANDLER ERROR] Ошибка в show_answer_callback: {e}")
+        print_flush(f"[HANDLER ERROR] Детали: {error_details}")
+        logger.error(f"Ошибка в show_answer_callback: {e}\n{error_details}")
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
+            except:
+                pass
 
 
 async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмечает вопрос как выученный"""
-    query = update.callback_query
-    await query.answer()
-
     try:
-        _, question_id_str = query.data.split(":", 1)
-        question_id = int(question_id_str)
-    except Exception:
-        await query.edit_message_text("❌ Некорректный запрос")
-        return
+        query = update.callback_query
+        if not query:
+            print_flush("[HANDLER ERROR] query is None in mark_learned_callback")
+            return
+        
+        await query.answer()
 
-    user = query.from_user
-    inserted = db.mark_question_learned(user.id, user.username, question_id)
-    status_text = "✅ Вопрос отмечен как выученный" if inserted else "✅ Уже был отмечен как выученный"
+        try:
+            _, question_id_str = query.data.split(":", 1)
+            question_id = int(question_id_str)
+        except Exception as e:
+            print_flush(f"[HANDLER ERROR] Ошибка парсинга question_id: {e}, data={query.data}")
+            await query.edit_message_text("❌ Некорректный запрос")
+            return
 
-    keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
-    inline_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(f"{status_text}\n\nНажми, чтобы получить новый вопрос.", reply_markup=inline_markup)
+        user = query.from_user
+        inserted = db.mark_question_learned(user.id, user.username, question_id)
+        status_text = "✅ Вопрос отмечен как выученный" if inserted else "✅ Уже был отмечен как выученный"
+
+        keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
+        inline_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(f"{status_text}\n\nНажми, чтобы получить новый вопрос.", reply_markup=inline_markup)
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print_flush(f"[HANDLER ERROR] Ошибка в mark_learned_callback: {e}")
+        print_flush(f"[HANDLER ERROR] Детали: {error_details}")
+        logger.error(f"Ошибка в mark_learned_callback: {e}\n{error_details}")
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
+            except:
+                pass
 
 
 async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Пользователь выбрал повторить — ничего не пишем в БД"""
-    query = update.callback_query
-    await query.answer()
+    try:
+        query = update.callback_query
+        if not query:
+            print_flush("[HANDLER ERROR] query is None in repeat_callback")
+            return
+        
+        await query.answer()
 
-    keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
-    inline_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text("Ок, повторим позже. Нажми, чтобы взять другой вопрос.", reply_markup=inline_markup)
+        keyboard = [[InlineKeyboardButton("🎲 Случайный вопрос", callback_data="random_question")]]
+        inline_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("Ок, повторим позже. Нажми, чтобы взять другой вопрос.", reply_markup=inline_markup)
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print_flush(f"[HANDLER ERROR] Ошибка в repeat_callback: {e}")
+        print_flush(f"[HANDLER ERROR] Детали: {error_details}")
+        logger.error(f"Ошибка в repeat_callback: {e}\n{error_details}")
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.")
+            except:
+                pass
 
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -199,19 +265,36 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
     import traceback
     error_details = traceback.format_exc()
-    print_flush(f"Ошибка при обработке обновления: {context.error}")
-    print_flush(f"Детали ошибки: {error_details}")
+    error_str = str(context.error) if context.error else "Неизвестная ошибка"
+    error_type = type(context.error).__name__ if context.error else "Unknown"
     
-    if update and update.message:
-        try:
+    print_flush(f"[ERROR HANDLER] Ошибка при обработке обновления: {error_type}: {error_str}")
+    print_flush(f"[ERROR HANDLER] Детали ошибки: {error_details}")
+    logger.error(f"Ошибка при обработке обновления: {error_type}: {error_str}\n{error_details}")
+    
+    # Пытаемся отправить сообщение об ошибке
+    try:
+        if update and update.message:
             await update.message.reply_text(
-                f"❌ Произошла ошибка: {str(context.error)}\n\nПопробуйте позже или используйте /help",
+                f"❌ Произошла ошибка: {error_str}\n\nПопробуйте позже или используйте /start",
                 reply_markup=reply_markup
             )
-        except TelegramTimedOut as timeout_error:
-            print_flush(f"[ERROR HANDLER] Таймаут при отправке сообщения об ошибке: {timeout_error}")
-            logger.error(f"Таймаут при отправке сообщения об ошибке: {timeout_error}")
-        except Exception as e:
-            print_flush(f"[ERROR HANDLER] Не удалось отправить сообщение об ошибке: {e}")
-            logger.error(f"Не удалось отправить сообщение об ошибке: {e}")
+        elif update and update.callback_query:
+            # Если это callback query, пытаемся ответить на него
+            try:
+                await update.callback_query.answer(f"❌ Ошибка: {error_str[:50]}", show_alert=True)
+            except:
+                # Если не получилось ответить на callback, пытаемся отредактировать сообщение
+                try:
+                    await update.callback_query.edit_message_text(
+                        f"❌ Произошла ошибка: {error_str}\n\nПопробуйте позже."
+                    )
+                except:
+                    pass
+    except TelegramTimedOut as timeout_error:
+        print_flush(f"[ERROR HANDLER] Таймаут при отправке сообщения об ошибке: {timeout_error}")
+        logger.error(f"Таймаут при отправке сообщения об ошибке: {timeout_error}")
+    except Exception as e:
+        print_flush(f"[ERROR HANDLER] Не удалось отправить сообщение об ошибке: {e}")
+        logger.error(f"Не удалось отправить сообщение об ошибке: {e}")
 
