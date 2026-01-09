@@ -1,6 +1,7 @@
 """
 Обработчики команд и сообщений для телеграм бота (без LLM)
 """
+import asyncio
 import logging
 import sys
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
@@ -59,7 +60,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_random_question(chat, user_id: int):
     """Отправляет случайный невыученный вопрос в указанный чат"""
-    total_count = db.get_total_questions_count()
+    # Выполняем синхронные вызовы БД в отдельном потоке, чтобы не блокировать event loop
+    total_count = await asyncio.to_thread(db.get_total_questions_count)
     if total_count == 0:
         await chat.reply_text(
             "❌ В базе данных нет вопросов.\n"
@@ -68,7 +70,7 @@ async def send_random_question(chat, user_id: int):
         )
         return
     
-    question = db.get_random_question(user_id)
+    question = await asyncio.to_thread(db.get_random_question, user_id)
     if not question:
         await chat.reply_text(
             "Все вопросы уже отмечены как выученные! 🎉\n"
@@ -94,7 +96,8 @@ async def random_question_callback(update: Update, context: ContextTypes.DEFAULT
         await query.answer()
 
         user_id = query.from_user.id
-        total_count = db.get_total_questions_count()
+        # Выполняем синхронные вызовы БД в отдельном потоке
+        total_count = await asyncio.to_thread(db.get_total_questions_count)
         
         if total_count == 0:
             await query.edit_message_text(
@@ -103,7 +106,7 @@ async def random_question_callback(update: Update, context: ContextTypes.DEFAULT
             )
             return
         
-        question = db.get_random_question(user_id)
+        question = await asyncio.to_thread(db.get_random_question, user_id)
 
         if not question:
             await query.edit_message_text(
@@ -158,7 +161,8 @@ async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 pass
             return
 
-        question = db.get_question_by_id(question_id)
+        # Выполняем синхронные вызовы БД в отдельном потоке
+        question = await asyncio.to_thread(db.get_question_by_id, question_id)
         if not question:
             try:
                 await query.edit_message_text("❌ Вопрос не найден в базе")
@@ -166,10 +170,10 @@ async def show_answer_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 pass
             return
 
-        # Логируем показ ответа
+        # Логируем показ ответа (не блокируем основной поток)
         user = query.from_user
         username = user.username or user.first_name or f"user_{user.id}"
-        db.log_user_action(username, question_id)
+        await asyncio.to_thread(db.log_user_action, username, question_id)
 
         message = _question_text(question, with_answer=True)
         keyboard = [
@@ -222,8 +226,8 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 pass
             return
 
-        # Получаем вопрос из БД, чтобы сохранить текст
-        question = db.get_question_by_id(question_id)
+        # Выполняем синхронные вызовы БД в отдельном потоке
+        question = await asyncio.to_thread(db.get_question_by_id, question_id)
         if not question:
             try:
                 await query.edit_message_text("❌ Вопрос не найден в базе")
@@ -232,12 +236,12 @@ async def mark_learned_callback(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         user = query.from_user
-        inserted = db.mark_question_learned(user.id, user.username, question_id)
+        inserted = await asyncio.to_thread(db.mark_question_learned, user.id, user.username, question_id)
         status_text = "✅ Вопрос отмечен как выученный" if inserted else "✅ Уже был отмечен как выученный"
 
-        # Логируем действие (если еще не было залогировано при показе ответа)
+        # Логируем действие (не блокируем основной поток)
         username = user.username or user.first_name or f"user_{user.id}"
-        db.log_user_action(username, question_id)
+        await asyncio.to_thread(db.log_user_action, username, question_id)
 
         # Формируем сообщение с вопросом, ответом и статусом
         message = _question_text(question, with_answer=True)
@@ -287,8 +291,8 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
             return
 
-        # Получаем вопрос из БД, чтобы сохранить текст
-        question = db.get_question_by_id(question_id)
+        # Выполняем синхронные вызовы БД в отдельном потоке
+        question = await asyncio.to_thread(db.get_question_by_id, question_id)
         if not question:
             try:
                 await query.edit_message_text("❌ Вопрос не найден в базе")
@@ -296,10 +300,10 @@ async def repeat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
             return
 
-        # Логируем действие (если еще не было залогировано при показе ответа)
+        # Логируем действие (не блокируем основной поток)
         user = query.from_user
         username = user.username or user.first_name or f"user_{user.id}"
-        db.log_user_action(username, question_id)
+        await asyncio.to_thread(db.log_user_action, username, question_id)
 
         # Формируем сообщение с вопросом, ответом и статусом
         message = _question_text(question, with_answer=True)
