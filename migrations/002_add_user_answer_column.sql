@@ -11,5 +11,16 @@ ADD COLUMN IF NOT EXISTS user_answer TEXT;
 
 -- Комментарий к колонке для документации
 COMMENT ON COLUMN user_logs.user_answer IS 'Ответ пользователя на вопрос';
-COMMENT ON COLUMN logs.user_answer IS 'Ответ пользователя на вопрос (устаревшая таблица)';
+
+-- Добавляем комментарий для таблицы logs только если она существует
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'logs'
+    ) THEN
+        COMMENT ON COLUMN logs.user_answer IS 'Ответ пользователя на вопрос (устаревшая таблица)';
+    END IF;
+END $$;
 

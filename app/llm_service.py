@@ -90,14 +90,18 @@ class LLMService:
         self.client = openai.OpenAI(**client_kwargs)
         
         # Проверяем фактический таймаут HTTP клиента
+        timeout_info = f"connect=30.0s, read={LLM_TIMEOUT}s, write=30.0s, pool=30.0s"
+        print(f"[LLM] OpenAI клиент инициализирован. Настроенный таймаут: {timeout_info}")
         if hasattr(self.client, '_client') and hasattr(self.client._client, '_client'):
             actual_timeout = getattr(self.client._client._client, 'timeout', None)
             if actual_timeout:
+                print(f"[LLM] Фактический таймаут HTTP клиента: {actual_timeout}")
                 logger.info(f"Фактический таймаут HTTP клиента: {actual_timeout}")
             else:
+                print(f"[LLM] Не удалось определить фактический таймаут HTTP клиента")
                 logger.warning("Не удалось определить фактический таймаут HTTP клиента")
         
-        logger.info(f"OpenAI клиент инициализирован. Настроенный таймаут: connect=30.0s, read={LLM_TIMEOUT}s, write=30.0s, pool=30.0s")
+        logger.info(f"OpenAI клиент инициализирован. Настроенный таймаут: {timeout_info}")
     
     def evaluate_answer(self, question: str, user_answer: str, correct_answer: Optional[str] = None) -> str:
         """
@@ -127,6 +131,7 @@ class LLMService:
         # Логируем начало запроса
         import time
         start_time = time.time()
+        print(f"[LLM] Начало запроса к LLM API (таймаут: {LLM_TIMEOUT} сек)")
         logger.info(f"Начало запроса к LLM API (таймаут: {LLM_TIMEOUT} сек)")
         
         try:
@@ -143,6 +148,7 @@ class LLMService:
             )
             
             elapsed_time = time.time() - start_time
+            print(f"[LLM] Запрос к LLM API выполнен успешно за {elapsed_time:.2f} секунд")
             logger.info(f"Запрос к LLM API выполнен успешно за {elapsed_time:.2f} секунд")
             
             if not response.choices or not response.choices[0].message:
@@ -155,6 +161,15 @@ class LLMService:
             import traceback
             elapsed_time = time.time() - start_time
             error_details = traceback.format_exc()
+            error_msg = (
+                f"Таймаут при запросе к LLM API. "
+                f"Прошло времени: {elapsed_time:.2f} секунд, "
+                f"Таймаут: {LLM_TIMEOUT} секунд, "
+                f"Ошибка: {str(e)}, "
+                f"Тип ошибки: {type(e).__name__}"
+            )
+            print(f"[LLM ERROR] {error_msg}")
+            print(f"[LLM ERROR] Детали ошибки:\n{error_details}")
             logger.error(
                 f"Таймаут при запросе к LLM API. "
                 f"Прошло времени: {elapsed_time:.2f} секунд, "

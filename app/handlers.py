@@ -170,6 +170,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 username = update.message.from_user.username or update.message.from_user.first_name or "unknown"
                 user_id = update.message.from_user.id
                 
+                error_msg = (
+                    f"Таймаут при оценке ответа. "
+                    f"Пользователь: {username} (ID: {user_id}), "
+                    f"Вопрос ID: {current_question['id']}, "
+                    f"Ошибка: {str(e)}"
+                )
+                print(f"[HANDLER ERROR] {error_msg}")
+                print(f"[HANDLER ERROR] Детали ошибки:\n{error_details}")
                 logger.error(
                     f"Таймаут при оценке ответа. "
                     f"Пользователь: {username} (ID: {user_id}), "
@@ -197,8 +205,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             except Exception as e:
                 import traceback
                 error_details = traceback.format_exc()
-                print(f"Ошибка при оценке ответа: {error_details}")
                 error_msg = str(e)
+                print(f"[HANDLER ERROR] Ошибка при оценке ответа: {error_msg}")
+                print(f"[HANDLER ERROR] Детали ошибки:\n{error_details}")
                 # Ограничиваем длину сообщения об ошибке для Telegram
                 if len(error_msg) > 200:
                     error_msg = error_msg[:200] + "..."
