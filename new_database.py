@@ -7,9 +7,12 @@ from psycopg2.extras import RealDictCursor
 from typing import Optional, Dict
 from app.config import DB_CONFIG
 import random
-import logging
 
-logger = logging.getLogger(__name__)
+# Настраиваем вывод print() в stdout с немедленным flush для docker logs
+def print_flush(*args, **kwargs):
+    """Обертка над print() с немедленным flush для docker logs"""
+    print(*args, **kwargs, flush=True, file=sys.stdout)
+
 
 class Database:
     """Класс для работы с базой данных"""
@@ -22,7 +25,7 @@ class Database:
         db_name = self.config.get('database')
         db_user = self.config.get('user')
         
-        logger.debug(f"Подключение к БД: host={self.config.get('host')}, database={db_name}, user={db_user}")
+        print_flush(f"[DEBUG] Подключение к БД: host={self.config.get('host')}, database={db_name}, user={db_user}")
         
         if not db_name:
             raise ValueError(f"ОШИБКА: database не установлен! config={self.config}")
@@ -35,7 +38,7 @@ class Database:
             )
         
         connection_params = self.config.copy()
-        logger.debug(f"Финальные параметры подключения: database={connection_params.get('database')}, user={connection_params.get('user')}")
+        print_flush(f"[DEBUG] Финальные параметры подключения: database={connection_params.get('database')}, user={connection_params.get('user')}")
         return psycopg2.connect(**connection_params)
 
     def get_random_question(self, user_id: int) -> Optional[Dict]:
@@ -57,15 +60,15 @@ class Database:
                     )
                     unlearned_count = cursor.fetchone()['count']
                     
-                    logger.info(f"Найдено {unlearned_count} невыученных вопросов для user_id={user_id}")
+                    print_flush(f"[DB] Найдено {unlearned_count} невыученных вопросов для user_id={user_id}")
 
                     if unlearned_count == 0:
                         # Проверяем, есть ли вообще вопросы в базе
                         cursor.execute("SELECT COUNT(*) FROM questions")
                         if cursor.fetchone()['count'] > 0:
-                            logger.info(f"Все вопросы выучены пользователем {user_id}")
+                            print_flush(f"[DB] Все вопросы выучены пользователем {user_id}")
                         else:
-                            logger.info(f"В базе нет вопросов")
+                            print_flush(f"[DB] В базе нет вопросов")
                         return None
                     
                     # Выбираем случайный offset
@@ -89,14 +92,17 @@ class Database:
                     result = cursor.fetchone()
                     
                     if result:
-                        logger.info(f"Найден вопрос: id={result['id']} (offset={random_offset})")
+                        print_flush(f"[DB] Найден вопрос: id={result['id']} (offset={random_offset})")
                         return result
                     else:
-                        logger.warning(f"Неожиданно не найдено вопросов с offset={random_offset}, хотя unlearned_count={unlearned_count}")
+                        print_flush(f"[DB] Неожиданно не найдено вопросов с offset={random_offset}, хотя unlearned_count={unlearned_count}")
                         return None
 
         except psycopg2.Error as e:
-            logger.exception(f"Ошибка при получении случайного вопроса: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            print_flush(f"[DB ERROR] Ошибка при получении случайного вопроса: {e}")
+            print_flush(f"[DB ERROR] Детали: {error_details}")
             return None
     
     def get_total_questions_count(self) -> int:
@@ -107,7 +113,7 @@ class Database:
                     cursor.execute("SELECT COUNT(*) FROM questions")
                     return cursor.fetchone()[0]
         except psycopg2.Error as e:
-            logger.exception(f"Ошибка при получении количества вопросов: {e}")
+            print_flush(f"Ошибка при получении количества вопросов: {e}")
             return 0
 
     def get_question_by_id(self, question_id: int) -> Optional[Dict]:
@@ -122,7 +128,7 @@ class Database:
                     result = cursor.fetchone()
                     return result if result else None
         except psycopg2.Error as e:
-            logger.exception(f"Ошибка при получении вопроса по id: {e}")
+            print_flush(f"Ошибка при получении вопроса по id: {e}")
             return None
 
     def mark_question_learned(self, user_id: int, username: Optional[str], question_id: int) -> bool:
@@ -140,10 +146,10 @@ class Database:
                     )
                     inserted = cursor.rowcount > 0
                     conn.commit()
-                    logger.info(f"Отмечен выученный вопрос: user_id={user_id}, question_id={question_id}, inserted={inserted}")
+                    print_flush(f"[DB] Отмечен выученный вопрос: user_id={user_id}, question_id={question_id}, inserted={inserted}")
                     return inserted
         except psycopg2.Error as e:
-            logger.exception(f"Ошибка при отметке вопроса как выученного: {e}")
+            print_flush(f"Ошибка при отметке вопроса как выученного: {e}")
             return False
 
     def log_user_action(self, username: str, question_id: int):
@@ -159,6 +165,6 @@ class Database:
                         (username, question_id)
                     )
                     conn.commit()
-                    logger.info(f"Записан лог: username={username}, question_id={question_id}")
+                    print_flush(f"[DB] Записан лог: username={username}, question_id={question_id}")
         except psycopg2.Error as e:
-            logger.exception(f"Ошибка при записи лога: {e}")
+            print_flush(f"Ошибка при записи лога: {e}")
