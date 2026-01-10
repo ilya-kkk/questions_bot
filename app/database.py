@@ -110,6 +110,20 @@ class Database:
             logger.exception(f"Ошибка при получении количества вопросов: {e}")
             return 0
 
+    def get_learned_questions_count(self, user_id: int) -> int:
+        """Возвращает количество вопросов, отмеченных пользователем как выученные"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM learned_questions WHERE user_id = %s",
+                        (user_id,)
+                    )
+                    return cursor.fetchone()[0]
+        except psycopg2.Error as e:
+            logger.exception(f"Ошибка при получении количества выученных вопросов: {e}")
+            return 0
+
     def get_question_by_id(self, question_id: int) -> Optional[Dict]:
         """Возвращает вопрос по id"""
         try:
