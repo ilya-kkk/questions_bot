@@ -13,7 +13,7 @@ from app.messages import (
     WELCOME, NO_QUESTIONS, ALL_QUESTIONS_LEARNED, QUESTION_NOT_FOUND,
     INVALID_REQUEST, QUESTION_MARKED_LEARNED, QUESTION_ALREADY_MARKED_LEARNED,
     QUESTION_WILL_BE_REPEATED, USE_RANDOM_QUESTION_BUTTON, ERROR_MESSAGE,
-    ERROR_WITH_START
+    ERROR_WITH_START, LEARNED_STATS
 )
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ db = Database()
 
 # Reply Keyboard (рядом с полем ввода)
 reply_keyboard = [
-    [KeyboardButton("🎲 Случайный вопрос")]
+    [KeyboardButton("🎲 Случайный вопрос"), KeyboardButton("📊 Статистика")]
 ]
 reply_markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
@@ -251,6 +251,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     if text == "🎲 Случайный вопрос":
         user_id = update.message.from_user.id
         await send_random_question(update.message, user_id)
+        return
+    if text == "📊 Статистика":
+        user_id = update.message.from_user.id
+        learned_count = await asyncio.to_thread(db.get_learned_questions_count, user_id)
+        await update.message.reply_text(
+            LEARNED_STATS.format(count=learned_count),
+            reply_markup=reply_markup
+        )
         return
 
     try:
