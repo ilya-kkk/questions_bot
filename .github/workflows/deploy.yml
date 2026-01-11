@@ -40,15 +40,15 @@ jobs:
               else
                 ./.venv-tests/bin/python -m pip install pytest pytest-asyncio pytest-mock
               fi
-              ./.venv-tests/bin/python -m pytest -q -m unit
+              ./.venv-tests/bin/python -m pytest -q -m unit tests/unit
               exit 0
             fi
           fi
           echo "python3 venv not available, running tests in container"
           if [ -f "docker-compose.yaml" ]; then
-            docker compose -f docker-compose.yaml run --rm --no-deps app pytest -q -m unit
+            docker compose -f docker-compose.yaml run --rm --no-deps app pytest -q -m unit tests/unit
           elif [ -f "docker-compose.yml" ]; then
-            docker compose -f docker-compose.yml run --rm --no-deps app pytest -q -m unit
+            docker compose -f docker-compose.yml run --rm --no-deps app pytest -q -m unit tests/unit
           else
             echo "ОШИБКА: docker-compose файл не найден!"
             exit 1
