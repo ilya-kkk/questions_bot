@@ -30,23 +30,27 @@ jobs:
       - name: Run unit tests
         run: |
           cd /home/cm5/questions_bot
-          if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
-            python3 -m pip install --upgrade pip
-            python3 -m pip install -r requirements.txt
-            if [ -f "requirements-dev.txt" ]; then
-              python3 -m pip install -r requirements-dev.txt
+          if command -v python3 >/dev/null 2>&1; then
+            rm -rf .venv-tests
+            if python3 -m venv .venv-tests >/dev/null 2>&1; then
+              . .venv-tests/bin/activate
+              python -m pip install --upgrade pip
+              python -m pip install -r requirements.txt
+              if [ -f "requirements-dev.txt" ]; then
+                python -m pip install -r requirements-dev.txt
+              fi
+              pytest -q -m unit
+              exit 0
             fi
-            pytest -q -m unit
+          fi
+          echo "python3 venv not available, running tests in container"
+          if [ -f "docker-compose.yaml" ]; then
+            docker compose -f docker-compose.yaml run --rm --no-deps app pytest -q -m unit
+          elif [ -f "docker-compose.yml" ]; then
+            docker compose -f docker-compose.yml run --rm --no-deps app pytest -q -m unit
           else
-            echo "python3/pip not available, running tests in container"
-            if [ -f "docker-compose.yaml" ]; then
-              docker compose -f docker-compose.yaml run --rm --no-deps app pytest -q -m unit
-            elif [ -f "docker-compose.yml" ]; then
-              docker compose -f docker-compose.yml run --rm --no-deps app pytest -q -m unit
-            else
-              echo "ОШИБКА: docker-compose файл не найден!"
-              exit 1
-            fi
+            echo "ОШИБКА: docker-compose файл не найден!"
+            exit 1
           fi
 
   deploy:
