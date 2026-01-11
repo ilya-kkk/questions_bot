@@ -51,6 +51,12 @@ docker-compose exec app python import_data.py
 - `import_data.py` — импорт вопросов из `raw.json`
 - `run_migrations.py` — применение миграций
 
+## Тесты
+
+Локальный запуск unit-тестов:
+`pip install -r requirements.txt -r requirements-dev.txt`
+`pytest -q`
+
 ## Остановка
 
 ```bash

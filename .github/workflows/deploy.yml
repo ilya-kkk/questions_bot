@@ -26,6 +26,28 @@ jobs:
           git fetch origin
           git pull origin main || git pull origin master || true
           echo "Последний коммит: $(git log -1 --oneline)"
+
+      - name: Run unit tests
+        run: |
+          cd /home/cm5/questions_bot
+          if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
+            python3 -m pip install --upgrade pip
+            python3 -m pip install -r requirements.txt
+            if [ -f "requirements-dev.txt" ]; then
+              python3 -m pip install -r requirements-dev.txt
+            fi
+            pytest -q -m unit
+          else
+            echo "python3/pip not available, running tests in container"
+            if [ -f "docker-compose.yaml" ]; then
+              docker compose -f docker-compose.yaml run --rm --no-deps app pytest -q -m unit
+            elif [ -f "docker-compose.yml" ]; then
+              docker compose -f docker-compose.yml run --rm --no-deps app pytest -q -m unit
+            else
+              echo "ОШИБКА: docker-compose файл не найден!"
+              exit 1
+            fi
+          fi
       
       - name: Stop and remove containers
         run: |
@@ -66,4 +88,3 @@ jobs:
           cd /home/cm5/questions_bot
           echo "Последние логи приложения:"
           docker compose logs --tail=20 app || true
-
