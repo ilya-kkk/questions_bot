@@ -33,13 +33,14 @@ jobs:
           if command -v python3 >/dev/null 2>&1; then
             rm -rf .venv-tests
             if python3 -m venv .venv-tests >/dev/null 2>&1; then
-              . .venv-tests/bin/activate
-              python -m pip install --upgrade pip
-              python -m pip install -r requirements.txt
+              ./.venv-tests/bin/python -m pip install --upgrade pip
+              ./.venv-tests/bin/python -m pip install -r requirements.txt
               if [ -f "requirements-dev.txt" ]; then
-                python -m pip install -r requirements-dev.txt
+                ./.venv-tests/bin/python -m pip install -r requirements-dev.txt
+              else
+                ./.venv-tests/bin/python -m pip install pytest pytest-asyncio pytest-mock
               fi
-              pytest -q -m unit
+              ./.venv-tests/bin/python -m pytest -q -m unit
               exit 0
             fi
           fi
